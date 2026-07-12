@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 ## Overview
 
-Write full implementation plans from spec file. Assume engineer has zero codebase context, questionable taste. Document everything: files to touch per task, code, testing, docs to check, how to test. Bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
+Write full implementation plans from spec file. Assume engineer has zero codebase context, questionable taste. Document everything: files to touch per task, exact interfaces, behavior, test cases as data, docs to check, how to test. The plan specifies WHAT and the contract; the implementer writes the code via real TDD. Bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
 
 Assume skilled developer, but knows almost nothing about toolset or problem domain. Assume weak test design knowledge.
 
@@ -20,6 +20,8 @@ User provides spec file [SPEC_FILE_PATH] = $0.
 ## PLAN_FILE_PATH
 
 `/home/hermes/.superpowers/YYYY/<feature-name>/plan/plan.md`
+
+`YYYY` = current year (e.g. `2026`) — never create a literal `YYYY` directory.
 
 **Save the plan index to:** [PLAN_FILE_PATH]
 
@@ -79,17 +81,21 @@ Task = smallest unit with own test cycle, worth fresh reviewer's gate. Drawing b
 
 ## Tasks
 
-1. [Task 0: ...](./tasks/task.00.md)
-2. [Task 1: ...](./tasks/task.01.md)
+1. [Task 1: ...](./tasks/task.01.md)
+2. [Task 2: ...](./tasks/task.02.md)
 
 ---
 ```
 
 ## Task Structure
 
-**Each task saved to own file** in `plan/tasks/` beside index, named `task.NN.md` (`NN` = zero-padded task number matching index list: `00`, `01`, `02`, ...). One task block per file. Index (`plan/plan.md`) links files in execution order (`./tasks/task.NN.md`), holds no task bodies.
+**Each task saved to own file** in `plan/tasks/` beside index, named `task.NN.md` (`NN` = zero-padded task number matching index list: `01`, `02`, `03`, ...). One task block per file. Index (`plan/plan.md`) links files in execution order (`./tasks/task.NN.md`), holds no task bodies.
 
-Task file reader has zero context, may read out of order — **each task file must be self-contained**. Restate any Global Constraint, code, type, signature it depends on; no pointing at other files.
+Task file reader has zero context, may read out of order — **each task file must be self-contained**. Restate any Global Constraint, type, signature it depends on; no pointing at other files.
+
+**Duplication across task files is deliberate; its cost is drift.** When a signature or constraint changes — during plan writing OR execution — grep the old symbol across the whole `plan/` directory, update every occurrence, verify zero leftovers. Values shared by many tasks belong in Global Constraints (one copy); restate only what is task-specific.
+
+**The plan specifies behavior and contracts, not implementation code.** Interfaces block carries exact signatures — that is what connects tasks. Behavior and Test Cases carry what the code must do, with test cases as data (input → expected output). The implementer writes the actual test and implementation code via real TDD: the failing test fails for a real reason, not one the planner guessed.
 
 ````markdown
 ### Task N: [Component Name]
@@ -105,32 +111,40 @@ Task file reader has zero context, may read out of order — **each task file mu
   and return types. A task's implementer sees only their own task; this
   block is how they learn the names and types neighboring tasks use.]
 
-- [ ] **Step 1: Write the failing test**
-
 ```python
-def test_specific_behavior():
-    result = function(input)
-    assert result == expected
+def parse_config(path: str) -> Config:  # exact signature — normative contract
 ```
+
+**Behavior:**
+[What the unit does: inputs, outputs, side effects, error handling.
+Enumerate edge cases explicitly — empty input, missing file, invalid
+format. Exact values (magic numbers, strings, formats) verbatim.]
+
+**Test cases (data, not code — implementer turns each into a real test):**
+
+| Input | Expected |
+|-------|----------|
+| `parse_config("valid.toml")` | `Config(port=8080, host="localhost")` |
+| `parse_config("missing.toml")` | raises `FileNotFoundError` |
+| `parse_config("empty.toml")` | raises `ConfigError("empty config")` |
+
+- [ ] **Step 1: Write the failing test for the first test case**
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/path/test.py::test_name -v`
-Expected: FAIL with "function not defined"
+Expected: FAIL (e.g. "function not defined") — confirm it fails for the right reason
 
-- [ ] **Step 3: Write minimal implementation**
-
-```python
-def function(input):
-    return expected
-```
+- [ ] **Step 3: Write minimal implementation satisfying Interfaces + Behavior**
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `pytest tests/path/test.py::test_name -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Repeat Steps 1-4 for each remaining test case**
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add tests/path/test.py src/path/file.py
@@ -140,17 +154,19 @@ git commit -m "feat: add specific feature"
 
 ## No Placeholders
 
-Every step must contain the actual content an engineer needs. These are **plan failures** — never write them:
+Every task must contain the actual contract an engineer needs. These are **plan failures** — never write them:
 - "TBD", "TODO", "implement later", "fill in details"
-- "Add appropriate error handling" / "add validation" / "handle edge cases"
-- "Write tests for the above" (without actual test code)
-- "Similar to Task N" (repeat the code — the engineer may be reading tasks out of order)
-- Steps that describe what to do without showing how (code blocks required for code steps)
+- "Add appropriate error handling" / "add validation" / "handle edge cases" (enumerate the cases and expected outcomes)
+- "Write tests for the above" (without concrete test cases as data)
+- A test case without a concrete input and expected output
+- Behavior described without its edge cases enumerated
+- "Similar to Task N" (restate the contract — the engineer may be reading tasks out of order)
+- Interfaces without exact signatures (names, parameter and return types)
 - References to types, functions, or methods not defined in any task
 
 ## Remember
 - Exact file paths always
-- Complete code in every step — if a step changes code, show the code
+- Complete behavior spec in every task: exact signatures, exact test cases as data, exact values
 - Exact commands with expected output
 - DRY, YAGNI, TDD, frequent commits
 
@@ -162,9 +178,22 @@ After writing the complete plan, look at the spec with fresh eyes and check the 
 
 **2. Placeholder scan:** Search your plan for red flags — any of the patterns from the "No Placeholders" section above. Fix them.
 
-**3. Type consistency:** Do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
+**3. Type consistency:** Do the signatures in each task's Interfaces block match across tasks? A function called `clearLayers()` in Task 3's Produces but `clearFullLayers()` in Task 7's Consumes is a bug.
 
 Issues found: fix inline. No re-review — fix, move on. Spec requirement with no task: add task.
+
+## Plan Review (subagent)
+
+After self-review passes, before the User Review Gate: dispatch one fresh reviewer subagent (general-purpose, read-only). Fresh eyes catch what the author cannot — this is the only review of the plan by someone who didn't write it.
+
+Dispatch prompt contains: spec path, plan index path, instruction to read every task file under `plan/tasks/`, and these checks:
+
+1. **Spec coverage:** every spec requirement maps to a task; list gaps.
+2. **Placeholder scan:** any pattern from the No Placeholders list above.
+3. **Interface consistency:** signatures in Produces/Consumes blocks match across tasks.
+4. **Self-containment:** could a reader with zero context execute each task file alone? Name what's missing.
+
+Reviewer returns findings with file:line. Fix findings; re-dispatch only if any were Critical/Important.
 
 **User Review Gate:**
 After plan review loop passes, ask user to review written plan before proceeding:
