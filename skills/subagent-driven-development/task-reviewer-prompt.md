@@ -55,7 +55,7 @@ Subagent (general-purpose):
 
     Compare diff against What Was Requested:
 
-    - **Missing:** requirements skipped, missed, or claimed without implementing - **Extra:** features not requested, over-engineering, unneeded "nice to haves" - **Misunderstood:** right feature built wrong way, wrong problem solved
+    - **Missing:** requirements skipped, missed, or claimed without implementing - **Extra:** features not requested, over-engineering, unneeded "nice to haves" - **Misunderstood:** right feature built wrong way, wrong problem solved - **Contract:** public signatures in diff match task file's Interfaces block exactly (names, parameter and return types) — neighboring tasks depend on them; any deviation = finding even if code works - **Test cases:** every test case declared in task file (input → expected output) exists as real test in diff
 
     Requirement not verifiable from diff alone (live in unchanged code or span tasks) → report as ⚠️ item, don't broaden search.
 

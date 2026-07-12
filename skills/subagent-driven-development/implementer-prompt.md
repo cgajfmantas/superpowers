@@ -2,6 +2,12 @@
 
 Use this template when dispatching an implementer subagent.
 
+**Placeholders:**
+- `[MODEL]` — REQUIRED: choose per SKILL.md Model Selection; an omitted model silently inherits the session's most expensive one
+- `[BRIEF_FILE]` — REQUIRED: plan task file (`plan/tasks/task.NN.md`) — self-contained requirements
+- `[REPORT_FILE]` — REQUIRED: file where implementer writes detailed report (`…/sdd/task-NN-report.md`)
+- `[directory]` — working directory for the task
+
 ```
 Subagent (general-purpose):
   description: "Implement Task N: [task name]"
@@ -14,6 +20,10 @@ Subagent (general-purpose):
 
     Read your task brief first: [BRIEF_FILE]
     It is the plan's task file (`plan/tasks/task.NN.md`) and contains the full, self-contained task text.
+
+    The brief's Interfaces block is a normative contract: implement those exact
+    signatures verbatim — neighboring tasks depend on them. Its test cases are
+    data (input → expected output): turn each one into a real test.
 
     ## Context
 
@@ -107,7 +117,7 @@ Subagent (general-purpose):
     Write your full report to [REPORT_FILE]:
     - What you implemented (or what you attempted, if blocked)
     - What you tested and test results
-    - **TDD Evidence** (if TDD was required for this task):
+    - **TDD Evidence** (required whenever your brief declares test cases):
       - RED: command run, relevant failing output before implementation, and why the failure was expected
       - GREEN: command run and relevant passing output after implementation
     - Files changed
