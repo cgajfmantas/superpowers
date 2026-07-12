@@ -113,6 +113,18 @@ Before dispatching each implementer, verify all six invariants:
 
 Gate failure means resolve the mismatch before dispatch. After the implementer returns, compare `HEAD`, `git status --short`, and the task range against the snapshot. Every new change must belong to the assigned task; unrelated pre-existing changes must remain untouched. Generate `review-package` only after this scope check, because it packages committed changes and cannot expose unrelated uncommitted edits.
 
+### Stash Safety Across Worktrees
+
+Git stashes are repository-wide, not worktree-local. Another worktree can change what `stash@{0}` identifies at any time.
+
+- Avoid stashing during SDD. Preserve and work around pre-existing changes whenever possible.
+- Never use `git stash pop`, implicit `git stash apply`, or an assumed `stash@{n}`.
+- If stashing is unavoidable, use a unique message containing the run and task identity, then immediately record the resulting full stash commit OID in the progress ledger.
+- Restore only with `git stash apply <recorded-OID>`. Inspect `git status` and the diff before considering removal.
+- Remove the stash only after locating the current `stash@{n}` whose full OID equals the recorded OID, for example with `git stash list --format='%H %gd %gs'`. Never drop by position alone.
+- Conflict, unknown provenance, or OID mismatch means stop and preserve the stash for human resolution.
+- Do not create tags for routine stash ownership; the recorded immutable OID is the identity and avoids persistent refs that may be pushed accidentally.
+
 ## Model Selection
 
 Use least powerful model that handles each role. Cheaper, faster.
@@ -177,7 +189,7 @@ Per-task reviews = task-scoped gates. Broad review happens once, at final whole-
 Everything pasted into dispatch prompt — and everything subagent prints back — stays resident in context rest of session, re-read every later turn. Hand artifacts as files:
 
 - **Task brief:** plan's task file (`plan/tasks/task.NN.md`) *is* brief — self-contained, no extract or copy. No reading task body into own context; hand path to implementer, subagent reads. Dispatch contains:
-  (1) one line where task fits in project; (2) task-file path, introduced as "read this first --- it is your requirements, with the exact values to use verbatim"; (3) interfaces and decisions from earlier tasks task file cannot know; (4) your resolution of any ambiguity (if you had to open file); (5) report-file path and report contract. Exact values (numbers, magic strings, signatures, test cases) live in task file.
+  (1) one line where task fits in project; (2) task-file path, introduced as "read this first --- it is your requirements, with the exact values to use verbatim"; (3) interfaces and decisions from earlier tasks task file cannot know; (4) relevant active lessons, or `None`; (5) explicit workspace strategy; (6) your resolution of any ambiguity (if you had to open file); (7) report-file path and report contract. Exact values (numbers, magic strings, signatures, test cases) live in task file.
 - **Report file:** name implementer's report file after task file, same zero-padded number (task `…/plan/tasks/task.NN.md` → report `…/sdd/task-NN-report.md`), put in dispatch prompt. Implementer writes full report there, returns only status, commits, one-line test summary, concerns.
 - **Reviewer inputs:** task reviewer gets three paths — same task file, report file, review package — plus global constraints binding task.
 - Fix dispatches append fix report (with test results) to same report file, return short summary; re-reviews read updated file.
