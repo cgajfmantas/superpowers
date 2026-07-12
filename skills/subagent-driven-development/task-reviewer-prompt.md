@@ -1,17 +1,17 @@
 # Task Reviewer Prompt Template
 
-Use this template when dispatching a task reviewer subagent. The reviewer reads the task's diff once and returns two verdicts: spec compliance and code quality.
+Use template when dispatching task reviewer subagent. Reviewer reads task diff once, returns two verdicts: spec compliance + code quality.
 
-**Purpose:** Verify one task's implementation matches its requirements (nothing more, nothing less) and is well-built (clean, tested, maintainable)
+**Purpose:** Verify one task implementation match requirements (nothing more, nothing less) and well-built (clean, tested, maintainable)
 
 **Placeholders:**
 - `[MODEL]` — REQUIRED: reviewer model per SKILL.md Model Selection
-- `[BRIEF_FILE]` — REQUIRED: the plan's task file (`plan/tasks/task.NN.md`) — the same self-contained file the implementer worked from
-- `[GLOBAL_CONSTRAINTS]` — the binding requirements copied verbatim from the plan's Global Constraints section or the spec: exact values, formats, and stated relationships between components (not process rules — those are already in this template)
-- `[REPORT_FILE]` — REQUIRED: the file the implementer wrote its detailed report
-- `[BASE_SHA]` — commit before this task
+- `[BRIEF_FILE]` — REQUIRED: plan task file (`plan/tasks/task.NN.md`) — same self-contained file implementer worked from
+- `[GLOBAL_CONSTRAINTS]` — binding requirements copied verbatim from plan Global Constraints section or spec: exact values, formats, stated relationships between components (not process rules — those already in template)
+- `[REPORT_FILE]` — REQUIRED: file implementer wrote detailed report
+- `[BASE_SHA]` — commit before task
 - `[HEAD_SHA]` — current commit
-- `[DIFF_FILE]` — REQUIRED: the path the controller wrote the review package to (`scripts/review-package PLAN_FILE BASE HEAD` prints the unique path it wrote; the package never enters the controller's context)
+- `[DIFF_FILE]` — REQUIRED: path controller wrote review package to (`scripts/review-package PLAN_FILE BASE HEAD` prints unique path it wrote; package never enters controller context)
 
 ```
 Subagent (general-purpose):
@@ -97,4 +97,4 @@ Subagent (general-purpose):
 
 **Reviewer returns:** Spec Compliance verdict (✅/❌/⚠️), Strengths, Issues (Critical/Important/Minor), Task quality verdict
 
-A fix dispatch can address spec gaps and quality findings together; re-review after fixes covers both verdicts.
+Fix dispatch can address spec gaps + quality findings together; re-review after fixes covers both verdicts.
