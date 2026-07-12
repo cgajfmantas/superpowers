@@ -1,11 +1,8 @@
 # Task Reviewer Prompt Template
 
-Use this template when dispatching a task reviewer subagent. The reviewer
-reads the task's diff once and returns two verdicts: spec compliance and
-code quality.
+Use this template when dispatching a task reviewer subagent. The reviewer reads the task's diff once and returns two verdicts: spec compliance and code quality.
 
-**Purpose:** Verify one task's implementation matches its requirements (nothing
-more, nothing less) and is well-built (clean, tested, maintainable)
+**Purpose:** Verify one task's implementation matches its requirements (nothing more, nothing less) and is well-built (clean, tested, maintainable)
 
 ```
 Subagent (general-purpose):
@@ -13,10 +10,7 @@ Subagent (general-purpose):
   model: [MODEL — REQUIRED: choose per SKILL.md Model Selection; an omitted
          model silently inherits the session's most expensive one]
   prompt: |
-    You are reviewing one task's implementation: first whether it matches its
-    requirements, then whether it is well-built. This is a task-scoped gate,
-    not a merge review — a broad whole-branch review happens separately after
-    all tasks are complete.
+    You are reviewing one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review — a broad whole-branch review happens separately after all tasks are complete.
 
     ## What Was Requested
 
@@ -86,9 +80,7 @@ Subagent (general-purpose):
     - **Misunderstood:** right feature built the wrong way, wrong problem
       solved
 
-    If a requirement cannot be verified from this diff alone (it lives in
-    unchanged code or spans tasks), report it as a ⚠️ item instead of
-    broadening your search.
+    If a requirement cannot be verified from this diff alone (it lives in unchanged code or spans tasks), report it as a ⚠️ item instead of broadening your search.
 
     ## Part 2: Code Quality
 
@@ -181,8 +173,6 @@ Subagent (general-purpose):
   package to (`scripts/review-package PLAN_FILE BASE HEAD` prints the unique path it
   wrote; the package never enters the controller's context)
 
-**Reviewer returns:** Spec Compliance verdict (✅/❌/⚠️), Strengths, Issues
-(Critical/Important/Minor), Task quality verdict
+**Reviewer returns:** Spec Compliance verdict (✅/❌/⚠️), Strengths, Issues (Critical/Important/Minor), Task quality verdict
 
-A fix dispatch can address spec gaps and quality findings together;
-re-review after fixes covers both verdicts.
+A fix dispatch can address spec gaps and quality findings together; re-review after fixes covers both verdicts.
