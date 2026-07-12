@@ -7,20 +7,30 @@ description: Use when you have a spec or requirements for a multi-step task, bef
 
 ## Overview
 
-Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
+Write comprehensive implementation plans from a spec file assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
 
 Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
 
+User provides the spec file [SPEC_FILE_PATH] = $0.
+
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
-**Context:** If working in an isolated worktree, it should have been created via the `superpowers:using-git-worktrees` skill at execution time.
+## PLAN_FILE_PATH
 
-**Save plans to:** `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`
-- (User preferences for plan location override this default)
+`/home/hermes/.superpowers/plans/YYYY/YYYY-MM-DD-<feature-name>.plan.md`
+
+**Save the plan index to:** [PLAN_FILE_PATH]
+
+A plan is split across files so no single file grows unwieldy:
+
+- **[PLAN_FILE_PATH]** is the *index*. It holds the plan header, Global Constraints, File Structure, and an ordered list of links to the task files. It does **not** contain task bodies.
+- **Each task lives in its own file** next to the index (see Task Structure for naming and layout).
+
+The index lists the task files in execution order under a `## Tasks` heading (see Plan Index Header).
 
 ## Scope Check
 
-If the spec covers multiple independent subsystems, it should have been broken into sub-project specs during brainstorming. If it wasn't, suggest breaking this into separate plans — one per subsystem. Each plan should produce working, testable software on its own.
+If the spec [SPEC_FILE_PATH] covers multiple independent subsystems, it should have been broken into sub-project specs during brainstorming. If it wasn't, suggest breaking this into separate plans — one per subsystem. Each plan should produce working, testable software on its own.
 
 ## File Structure
 
@@ -35,12 +45,7 @@ This structure informs the task decomposition. Each task should produce self-con
 
 ## Task Right-Sizing
 
-A task is the smallest unit that carries its own test cycle and is worth a
-fresh reviewer's gate. When drawing task boundaries: fold setup,
-configuration, scaffolding, and documentation steps into the task whose
-deliverable needs them; split only where a reviewer could meaningfully
-reject one task while approving its neighbor. Each task ends with an
-independently testable deliverable.
+A task is the smallest unit that carries its own test cycle and is worth a fresh reviewer's gate. When drawing task boundaries: fold setup, configuration, scaffolding, and documentation steps into the task whose deliverable needs them; split only where a reviewer could meaningfully reject one task while approving its neighbor. Each task ends with an independently testable deliverable.
 
 ## Bite-Sized Task Granularity
 
@@ -51,14 +56,13 @@ independently testable deliverable.
 - "Run the tests and make sure they pass" - step
 - "Commit" - step
 
-## Plan Document Header
+## Plan Index Header
 
-**Every plan MUST start with this header:**
+**The index file [PLAN_FILE_PATH] MUST start with this header, followed by
+the ordered task list:**
 
 ```markdown
 # [Feature Name] Implementation Plan
-
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** [One sentence describing what this builds]
 
@@ -68,15 +72,21 @@ independently testable deliverable.
 
 ## Global Constraints
 
-[The spec's project-wide requirements — version floors, dependency limits,
-naming and copy rules, platform requirements — one line each, with exact
-values copied verbatim from the spec. Every task's requirements implicitly
-include this section.]
+[The spec's project-wide requirements — version floors, dependency limits, naming and copy rules, platform requirements — one line each, with exact values copied verbatim from the spec. Every task's requirements implicitly include this section.]
+
+## Tasks
+
+1. [Task 0: ...](./YYYY-MM-DD-<feature-name>.plan.task.00.md)
+2. [Task 1: ...](./YYYY-MM-DD-<feature-name>.plan.task.01.md)
 
 ---
 ```
 
 ## Task Structure
+
+**Each task is saved to its own file** next to the index, named `YYYY-MM-DD-<feature-name>.plan.task.NN.md` (`NN` = zero-padded task number matching the index list: `00`, `01`, `02`, ...). One task block per file. The index ([PLAN_FILE_PATH]) links these files in execution order and holds no task bodies.
+
+A task file's reader has zero context and may read tasks out of order, so **each task file must be self-contained** — restate any Global Constraint, code, type, or signature it depends on rather than pointing at another file.
 
 ````markdown
 ### Task N: [Component Name]
@@ -153,22 +163,9 @@ After writing the complete plan, look at the spec with fresh eyes and check the 
 
 If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a spec requirement with no task, add the task.
 
-## Execution Handoff
+**User Review Gate:**
+After the plan review loop passes, ask the user to review the written plan before proceeding:
 
-After saving the plan, offer execution choice:
+> "Plan written and committed to [PLAN_FILE_PATH]. Review it and let me know if you want to make any changes."
 
-**"Plan complete and saved to `docs/superpowers/plans/<filename>.md`. Two execution options:**
-
-**1. Subagent-Driven (recommended)** - I dispatch a fresh subagent per task, review between tasks, fast iteration
-
-**2. Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints
-
-**Which approach?"**
-
-**If Subagent-Driven chosen:**
-- **REQUIRED SUB-SKILL:** Use superpowers:subagent-driven-development
-- Fresh subagent per task + two-stage review
-
-**If Inline Execution chosen:**
-- **REQUIRED SUB-SKILL:** Use superpowers:executing-plans
-- Batch execution with checkpoints for review
+Wait for the user's response. If they request changes, make them and re-run the plan review loop. Only proceed once the user approves.

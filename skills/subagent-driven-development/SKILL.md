@@ -60,12 +60,12 @@ digraph process {
         "Mark task complete in todo list and progress ledger" [shape=box];
     }
 
-    "Read plan, note context and global constraints, create todos" [shape=box];
+    "Read plan index only (task list + global constraints), create todos" [shape=box];
     "More tasks remain?" [shape=diamond];
     "Dispatch final code reviewer subagent (../requesting-code-review/code-reviewer.md)" [shape=box];
     "Use superpowers:finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
-    "Read plan, note context and global constraints, create todos" -> "Dispatch implementer subagent (./implementer-prompt.md)";
+    "Read plan index only (task list + global constraints), create todos" -> "Dispatch implementer subagent (./implementer-prompt.md)";
     "Dispatch implementer subagent (./implementer-prompt.md)" -> "Implementer subagent asks questions?";
     "Implementer subagent asks questions?" -> "Answer questions, provide context" [label="yes"];
     "Answer questions, provide context" -> "Dispatch implementer subagent (./implementer-prompt.md)";
@@ -84,17 +84,22 @@ digraph process {
 
 ## Pre-Flight Plan Review
 
-Before dispatching Task 1, scan the plan once for conflicts:
+Before dispatching Task 1, scan the plan index (task list + Global
+Constraints) for conflicts you can see without loading task bodies:
 
-- tasks that contradict each other or the plan's Global Constraints
-- anything the plan explicitly mandates that the review rubric treats as a
+- a task title or the Global Constraints that contradict each other
+- anything the constraints mandate that the review rubric treats as a
   defect (a test that asserts nothing, verbatim duplication of a logic block)
+
+Do not read every task file upfront to run this scan — the index is enough
+to catch plan-level conflicts, and the per-task review loop remains the net
+for conflicts that only emerge from a task's implementation. If you do spot
+something needing a task's detail, read that one task file, not all of them.
 
 Present everything you find to your human partner as one batched question —
 each finding beside the plan text that mandates it, asking which governs —
 before execution begins, not one interrupt per discovery mid-plan. If the
-scan is clean, proceed without comment. The review loop remains the net for
-conflicts that only emerge from implementation.
+scan is clean, proceed without comment.
 
 ## Model Selection
 
@@ -222,22 +227,22 @@ Everything you paste into a dispatch prompt — and everything a subagent
 prints back — stays resident in your context for the rest of the session
 and is re-read on every later turn. Hand artifacts over as files:
 
-- **Task brief:** before dispatching an implementer, run this skill's
-  `scripts/task-brief PLAN_FILE N` — it extracts the task's full text to a
-  uniquely named file and prints the path. Compose the dispatch so the
-  brief stays the single source of requirements. Your dispatch should
-  contain: (1) one line on where this task fits in the project; (2) the
-  brief path, introduced as "read this first — it is your requirements,
-  with the exact values to use verbatim"; (3) interfaces and decisions
-  from earlier tasks that the brief cannot know; (4) your resolution of
-  any ambiguity you noticed in the brief; (5) the report-file path and
-  report contract. Exact values (numbers, magic strings, signatures, test
-  cases) appear only in the brief.
-- **Report file:** name the implementer's report file after the brief
-  (brief `…/task-N-brief.md` → report `…/task-N-report.md`) and put it in
-  the dispatch prompt. The implementer writes the full report there and
-  returns only status, commits, a one-line test summary, and concerns.
-- **Reviewer inputs:** the task reviewer gets three paths — the same brief
+- **Task brief:** the plan's task file (`*.plan.task.NN.md`) *is* the
+  brief — it is self-contained, so you do not extract or copy it. Do not
+  read the task body into your own context; hand its path to the
+  implementer and let the subagent read it. Your dispatch should contain:
+  (1) one line on where this task fits in the project; (2) the task-file
+  path, introduced as "read this first — it is your requirements, with the
+  exact values to use verbatim"; (3) interfaces and decisions from earlier
+  tasks the task file cannot know; (4) your resolution of any ambiguity (if
+  you had to open the file); (5) the report-file path and report contract.
+  Exact values (numbers, magic strings, signatures, test cases) live in the
+  task file.
+- **Report file:** name the implementer's report file after the task file
+  (task `…/<name>.plan.task.0N.md` → report `…/task-N-report.md`) and put
+  it in the dispatch prompt. The implementer writes the full report there
+  and returns only status, commits, a one-line test summary, and concerns.
+- **Reviewer inputs:** the task reviewer gets three paths — the same task
   file, the report file, and the review package — plus the global
   constraints that bind the task.
 - Fix dispatches append their fix report (with test results) to the same
@@ -274,12 +279,12 @@ a ledger file, not only in todos.
 ```
 You: I'm using Subagent-Driven Development to execute this plan.
 
-[Read plan file once: docs/superpowers/plans/feature-plan.md]
-[Create todos for all tasks]
+[Read plan index only: docs/superpowers/plans/feature-plan.plan.md]
+[Create todos from the index task list]
 
 Task 1: Hook installation script
 
-[Run task-brief for Task 1; dispatch implementer with brief + report paths + context]
+[Dispatch implementer with the task-file path (…plan.task.00.md) + report path + context]
 
 Implementer: "Before I begin - should the hook be installed at user or system level?"
 
@@ -300,7 +305,7 @@ Task reviewer: Spec ✅ - all requirements met, nothing extra.
 
 Task 2: Recovery modes
 
-[Run task-brief for Task 2; dispatch implementer with brief + report paths + context]
+[Dispatch implementer with the task-file path (…plan.task.01.md) + report path + context]
 
 Implementer: [No questions, proceeds]
 Implementer:
@@ -360,7 +365,7 @@ Done!
 
 **Cost:**
 - More subagent invocations (implementer + reviewer per task)
-- Controller does more prep work (extracting all tasks upfront)
+- Controller does more prep work (per-task dispatch composition)
 - Review loops add iterations
 - But catches issues early (cheaper than debugging later)
 
@@ -371,8 +376,10 @@ Done!
 - Skip task review, or accept a report missing either verdict (spec compliance AND task quality are both required)
 - Proceed with unfixed issues
 - Dispatch multiple implementation subagents in parallel (conflicts)
-- Make a subagent read the whole plan file (hand it its task brief —
-  `scripts/task-brief` — instead)
+- Read all task files into your own context (read only the index; hand
+  each subagent its task-file path and let it read its own task)
+- Make a subagent read the whole plan (hand it its single task-file path
+  instead)
 - Skip scene-setting context (subagent needs to understand where task fits)
 - Ignore subagent questions (answer before letting them proceed)
 - Accept "close enough" on spec compliance (reviewer found spec issues = not done)
@@ -406,13 +413,8 @@ Done!
 ## Integration
 
 **Required workflow skills:**
-- **superpowers:using-git-worktrees** - Ensures isolated workspace (creates one or verifies existing)
-- **superpowers:writing-plans** - Creates the plan this skill executes
 - **superpowers:requesting-code-review** - Code review template for the final whole-branch review
 - **superpowers:finishing-a-development-branch** - Complete development after all tasks
 
 **Subagents should use:**
 - **superpowers:test-driven-development** - Subagents follow TDD for each task
-
-**Alternative workflow:**
-- **superpowers:executing-plans** - Use for parallel session instead of same-session execution

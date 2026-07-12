@@ -13,7 +13,7 @@ Subagent (general-purpose):
     ## Task Description
 
     Read your task brief first: [BRIEF_FILE]
-    It contains the full task text from the plan.
+    It is the plan's task file (`*.plan.task.NN.md`) and contains the full, self-contained task text.
 
     ## Context
 
@@ -44,26 +44,20 @@ Subagent (general-purpose):
     **While you work:** If you encounter something unexpected or unclear, **ask questions**.
     It's always OK to pause and clarify. Don't guess or make assumptions.
 
-    While iterating, run the focused test for what you're changing; run the
-    full suite once before committing, not after every edit.
+    While iterating, run the focused test for what you're changing; run the full suite once before committing, not after every edit.
 
     ## Code Organization
 
-    You reason best about code you can hold in context at once, and your edits are more
-    reliable when files are focused. Keep this in mind:
+    You reason best about code you can hold in context at once, and your edits are more reliable when files are focused. Keep this in mind:
     - Follow the file structure defined in the plan
     - Each file should have one clear responsibility with a well-defined interface
-    - If a file you're creating is growing beyond the plan's intent, stop and report
-      it as DONE_WITH_CONCERNS — don't split files on your own without plan guidance
-    - If an existing file you're modifying is already large or tangled, work carefully
-      and note it as a concern in your report
-    - In existing codebases, follow established patterns. Improve code you're touching
-      the way a good developer would, but don't restructure things outside your task.
+    - If a file you're creating is growing beyond the plan's intent, stop and report it as DONE_WITH_CONCERNS — don't split files on your own without plan guidance
+    - If an existing file you're modifying is already large or tangled, work carefully and note it as a concern in your report
+    - In existing codebases, follow established patterns. Improve code you're touching the way a good developer would, but don't restructure things outside your task.
 
     ## When You're in Over Your Head
 
-    It is always OK to stop and say "this is too hard for me." Bad work is worse than
-    no work. You will not be penalized for escalating.
+    It is always OK to stop and say "this is too hard for me." Bad work is worse than no work. You will not be penalized for escalating.
 
     **STOP and escalate when:**
     - The task requires architectural decisions with multiple valid approaches
@@ -72,10 +66,8 @@ Subagent (general-purpose):
     - The task involves restructuring existing code in ways the plan didn't anticipate
     - You've been reading file after file trying to understand the system without progress
 
-    **How to escalate:** Report back with status BLOCKED or NEEDS_CONTEXT. Describe
-    specifically what you're stuck on, what you've tried, and what kind of help you need.
-    The controller can provide more context, re-dispatch with a more capable model,
-    or break the task into smaller pieces.
+    **How to escalate:** Report back with status BLOCKED or NEEDS_CONTEXT. Describe specifically what you're stuck on, what you've tried, and what kind of help you need.
+    The controller can provide more context, re-dispatch with a more capable model, or break the task into smaller pieces.
 
     ## Before Reporting Back: Self-Review
 
@@ -106,9 +98,7 @@ Subagent (general-purpose):
 
     ## After Review Findings
 
-    If a reviewer finds issues and you fix them, re-run the tests that cover
-    the amended code and append the results to your report file. Reviewers
-    will not re-run tests for you — your report is the test evidence.
+    If a reviewer finds issues and you fix them, re-run the tests that cover the amended code and append the results to your report file. Reviewers will not re-run tests for you — your report is the test evidence.
 
     ## Report Format
 
@@ -130,8 +120,7 @@ Subagent (general-purpose):
     - Your concerns, if any
     - The report file path
 
-    If BLOCKED or NEEDS_CONTEXT, put the specifics in the final message
-    itself — the controller acts on it directly.
+    If BLOCKED or NEEDS_CONTEXT, put the specifics in the final message itself — the controller acts on it directly.
 
     Use DONE_WITH_CONCERNS if you completed the work but have doubts about correctness.
     Use BLOCKED if you cannot complete the task. Use NEEDS_CONTEXT if you need
