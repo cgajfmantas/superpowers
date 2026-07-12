@@ -32,7 +32,11 @@ Subagent (general-purpose):
 
     ## Read-Only Review
 
-    Your review is read-only on this checkout. Do not mutate the working tree, the index, HEAD, or branch state in any way. Use tools like `git show`, `git diff`, and `git log` to inspect history. If you need a working copy of a different revision, check it out into a separate temporary directory (e.g. `git worktree add /tmp/review-[SHA] [SHA]`) — never move HEAD on this checkout.
+    Your review is read-only on this checkout. Do not mutate the working tree, the index, HEAD, or branch state in any way. Use tools like `git show`, `git diff`, and `git log` to inspect history. If you need a working copy of a different revision, check it out into a separate temporary directory (e.g. `git worktree add /tmp/review-[SHA] [SHA]`) — never move HEAD on this checkout. Running the test suite is allowed and expected (see below); it does not count as mutating state.
+
+    ## Independent Verification
+
+    Run the project's full test suite once and cite the command and result in your Assessment. Implementer reports are unverified claims — yours is the only independent execution in the pipeline. If your environment cannot run the suite, state that explicitly in the Assessment; never write "all tests passing" without your own evidence.
 
     ## What to Check
 
@@ -58,7 +62,7 @@ Subagent (general-purpose):
     - Tests verify real behavior, not mocks?
     - Edge cases covered?
     - Integration tests where they matter?
-    - All tests passing?
+    - All tests passing? (run them yourself — see Independent Verification)
 
     **Production readiness:**
     - Migration strategy if schema changed?
