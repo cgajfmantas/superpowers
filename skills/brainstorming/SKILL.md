@@ -7,43 +7,39 @@ disable-model-invocation: true
 
 # Brainstorming Ideas Into Designs
 
-Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
+Turn ideas into full designs/specs via collaborative dialogue.
 
-Start by understanding the current project context, then ask questions one at a time to refine the idea. Once you understand what you're building, present the design and get user approval.
+Understand project context first. Ask questions one at time to refine idea. Once building clear, present design, get user approval.
 
 <HARD-GATE>
-Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
+No implementation skill, code, scaffold, or implementation action until design presented and user approved. Applies to EVERY project regardless of perceived simplicity.
 </HARD-GATE>
 
 **Announce at start:** "I'm using the brainstorming skill to create the spec plan."
 
 ## Anti-Pattern: "This Is Too Simple To Need A Design"
 
-Every project goes through this process. A todo list, a single-function utility, a config change — all of them. "Simple" projects are where unexamined assumptions cause the most wasted work. The design can be short (a few sentences for truly simple projects), but you MUST present it and get approval.
+Every project goes through process. Todo list, single-function utility, config change — all. "Simple" projects = where unexamined assumptions waste most work. Design can be short (few sentences for simple projects), but MUST present and get approval.
 
 ## SPEC_FILE_PATH
 
 `/home/hermes/.superpowers/YYYY/<feature-name>/spec/spec.md`
 
-A feature owns one directory — `/home/hermes/.superpowers/YYYY/<feature-name>/` —
-holding everything about it in sibling subfolders: `spec/`, `plan/`, and
-`sdd/`. The spec goes in `spec/spec.md`; the plan (`plan/plan.md`) and its
-task files (`plan/tasks/task.NN.md`) land in `plan/` (see
-superpowers:writing-plans); SDD execution artifacts land in `sdd/`.
+Feature owns one directory — `/home/hermes/.superpowers/YYYY/<feature-name>/` —
+everything in sibling subfolders: `spec/`, `plan/`, `sdd/`. Spec goes in `spec/spec.md`; plan (`plan/plan.md`) and task files (`plan/tasks/task.NN.md`) in `plan/` (see superpowers:writing-plans); SDD execution artifacts in `sdd/`.
 
 ## Checklist
 
-You MUST create a task for each of these items and complete them in order:
+MUST create task per item, complete in order:
 
-1. **Explore project context** — check files, docs, recent commits
-2. **Offer the visual companion just-in-time** — NOT upfront. The first time a question would genuinely be clearer shown than described, offer it then (its own message); on approval its browser tab opens for you. If no visual question ever arises, never offer it. See the Visual Companion section below.
-3. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
-4. **Propose 2-3 approaches** — with trade-offs and your recommendation
-5. **Present design** — in sections scaled to their complexity, get user approval after each section
-6. **Write design doc** — save to [SPEC_FILE_PATH] and commit
-7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
-8. **User reviews written spec** — ask user to review the spec file before proceeding
-9. **Transition to implementation** — invoke writing-plans skill to create implementation plan
+1. **Explore project context** — files, docs, recent commits
+2. **Ask clarifying questions** — one at time, understand purpose/constraints/success criteria
+3. **Propose 2-3 approaches** — trade-offs plus recommendation
+4. **Present design** — sections scaled to complexity, get approval after each section
+5. **Write design doc** — save to [SPEC_FILE_PATH], commit
+6. **Spec self-review** — quick inline check: placeholders, contradictions, ambiguity, scope (see below)
+7. **User reviews written spec** — user reviews spec file before proceeding
+8. **Transition to implementation** — invoke writing-plans skill for implementation plan
 
 ## Process Flow
 
@@ -72,81 +68,81 @@ digraph brainstorming {
 }
 ```
 
-**The terminal state is invoking writing-plans.** Do NOT invoke frontend-design, mcp-builder, or any other implementation skill. The ONLY skill you invoke after brainstorming is writing-plans.
+**Terminal state = invoking writing-plans.** NOT frontend-design, mcp-builder, or other implementation skill. ONLY skill after brainstorming: writing-plans.
 
 ## The Process
 
 **Understanding the idea:**
 
-- Check out the current project state first (files, docs, recent commits)
-- Before asking detailed questions, assess scope: if the request describes multiple independent subsystems (e.g., "build a platform with chat, file storage, billing, and analytics"), flag this immediately. Don't spend questions refining details of a project that needs to be decomposed first.
-- If the project is too large for a single spec, help the user decompose into sub-projects: what are the independent pieces, how do they relate, what order should they be built? Then brainstorm the first sub-project through the normal design flow. Each sub-project gets its own spec → plan → implementation cycle.
-- For appropriately-scoped projects, ask questions one at a time to refine the idea
-- Prefer multiple choice questions when possible, but open-ended is fine too
-- Only one question per message - if a topic needs more exploration, break it into multiple questions
-- Focus on understanding: purpose, constraints, success criteria
+- Check current project state first (files, docs, recent commits)
+- Before detailed questions, assess scope: request describes multiple independent subsystems (e.g., "build a platform with chat, file storage, billing, and analytics") = flag immediately. No spending questions on project needing decomposition first.
+- Project too large for single spec: help user decompose into sub-projects — independent pieces, relations, build order. Then brainstorm first sub-project through normal design flow. Each sub-project gets own spec → plan → implementation cycle.
+- Appropriately-scoped projects: ask questions one at time
+- Prefer multiple choice; open-ended fine too
+- One question per message — topic needs more exploration, break into multiple questions
+- Focus: purpose, constraints, success criteria
 
 **Exploring approaches:**
 
-- Propose 2-3 different approaches with trade-offs
-- Present options conversationally with your recommendation and reasoning
-- Lead with your recommended option and explain why
+- Propose 2-3 approaches with trade-offs
+- Present options conversationally with recommendation and reasoning
+- Lead with recommended option, explain why
 
 **Presenting the design:**
 
-- Once you believe you understand what you're building, present the design
-- Scale each section to its complexity: a few sentences if straightforward, up to 200-300 words if nuanced
-- Ask after each section whether it looks right so far
+- Once building clear, present design
+- Scale sections to complexity: few sentences if straightforward, up to 200-300 words if nuanced
+- Ask after each section: looks right so far?
 - Cover: architecture, components, data flow, error handling, testing
-- Be ready to go back and clarify if something doesn't make sense
+- Ready to go back and clarify if something unclear
 
 **Design for isolation and clarity:**
 
-- Break the system into smaller units that each have one clear purpose, communicate through well-defined interfaces, and can be understood and tested independently
-- For each unit, you should be able to answer: what does it do, how do you use it, and what does it depend on?
-- Can someone understand what a unit does without reading its internals? Can you change the internals without breaking consumers? If not, the boundaries need work.
-- Smaller, well-bounded units are also easier for you to work with - you reason better about code you can hold in context at once, and your edits are more reliable when files are focused. When a file grows large, that's often a signal that it's doing too much.
+- Break system into small units: one clear purpose each, well-defined interfaces, understandable and testable independently
+- Per unit, answer: what does it do, how use it, what does it depend on?
+- Understand unit without reading internals? Change internals without breaking consumers? No = boundaries need work.
+- Small well-bounded units easier for you too — better reasoning on code held in context at once, more reliable edits on focused files. Large file = often doing too much.
 
 **Working in existing codebases:**
 
-- Explore the current structure before proposing changes. Follow existing patterns.
-- Where existing code has problems that affect the work (e.g., a file that's grown too large, unclear boundaries, tangled responsibilities), include targeted improvements as part of the design - the way a good developer improves code they're working in.
-- Don't propose unrelated refactoring. Stay focused on what serves the current goal.
+- Explore current structure before proposing changes. Follow existing patterns.
+- Existing code problems affecting work (file grown too large, unclear boundaries, tangled responsibilities): include targeted improvements in design — like good developer improving code they work in.
+- No unrelated refactoring. Stay focused on current goal.
 
 ## After the Design
 
 **Documentation:**
 
-- Write the validated design (spec) to [SPEC_FILE_PATH]
-- Commit the design document to git
+- Write validated design (spec) to [SPEC_FILE_PATH]
+- Commit design document to git
 
 **Spec Self-Review:**
-After writing the spec document, look at it with fresh eyes:
+After writing spec document, fresh-eyes check:
 
-1. **Placeholder scan:** Any "TBD", "TODO", incomplete sections, or vague requirements? Fix them.
-2. **Internal consistency:** Do any sections contradict each other? Does the architecture match the feature descriptions?
-3. **Scope check:** Is this focused enough for a single implementation plan, or does it need decomposition?
-4. **Ambiguity check:** Could any requirement be interpreted two different ways? If so, pick one and make it explicit.
+1. **Placeholder scan:** "TBD", "TODO", incomplete sections, vague requirements? Fix.
+2. **Internal consistency:** Sections contradict? Architecture match feature descriptions?
+3. **Scope check:** Focused enough for single implementation plan, or needs decomposition?
+4. **Ambiguity check:** Requirement interpretable two ways? Pick one, make explicit.
 
-Fix any issues inline. No need to re-review — just fix and move on.
+Fix issues inline. No re-review — fix, move on.
 
 **User Review Gate:**
-After the spec review loop passes, ask the user to review the written spec before proceeding:
+After spec review loop passes, ask user to review written spec before proceeding:
 
 > "Spec written and committed to [SPEC_FILE_PATH]. Review it and let me know if you want to make any changes before we start writing out the implementation plan."
 
-Wait for the user's response. If they request changes, make them and re-run the spec review loop. Only proceed once the user approves.
+Wait for user response. Changes requested = make them, re-run spec review loop. Proceed only after user approves.
 
 **Implementation:**
 
-- Invoke the writing-plans skill to create a detailed implementation plan
-- Do NOT invoke any other skill. writing-plans is the next step.
+- Invoke writing-plans skill for detailed implementation plan
+- NO other skill. writing-plans = next step.
 
 ## Key Principles
 
-- **One question at a time** - Don't overwhelm with multiple questions
-- **Multiple choice preferred** - Easier to answer than open-ended when possible
-- **YAGNI ruthlessly** - Remove unnecessary features from all designs
-- **Explore alternatives** - Always propose 2-3 approaches before settling
+- **One question at a time** - No overwhelming with multiple questions
+- **Multiple choice preferred** - Easier than open-ended when possible
+- **YAGNI ruthlessly** - Cut unnecessary features from all designs
+- **Explore alternatives** - Always 2-3 approaches before settling
 - **Incremental validation** - Present design, get approval before moving on
-- **Be flexible** - Go back and clarify when something doesn't make sense
+- **Be flexible** - Go back, clarify when something unclear
