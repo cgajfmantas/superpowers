@@ -33,7 +33,7 @@ Subagent (general-purpose):
 
     Once you're clear on requirements:
     1. Implement exactly what the task specifies
-    2. Write tests (following TDD if task says to)
+    2. Turn the task's test cases into real tests first (TDD): watch each fail for the right reason before implementing
     3. Verify implementation works
     4. Commit your work
     5. Self-review (see below)
@@ -43,6 +43,8 @@ Subagent (general-purpose):
 
     **While you work:** If you encounter something unexpected or unclear, **ask questions**.
     It's always OK to pause and clarify. Don't guess or make assumptions.
+    If the controller's answer contradicts your task brief, the controller updates the
+    brief file — re-read it and follow the updated text, don't improvise over the stale version.
 
     While iterating, run the focused test for what you're changing; run the full suite once before committing, not after every edit.
 

@@ -96,9 +96,9 @@ Use least powerful model that handles each role. Cheaper, faster.
 
 **Always specify model explicitly when dispatching subagent.** Omitted model inherits session model — often most capable, most expensive — silently defeats this section.
 
-**Turn count beats token price.** Wall-clock and context cost scale with subagent turns; cheapest models routinely take 2-3× turns on multi-step work — cost more overall. Mid-tier model = floor for reviewers and implementers working from prose descriptions. Plan text contains complete code to write → implementation is transcription plus testing: cheapest tier for that implementer. Single-file mechanical fixes also cheapest tier.
+**Turn count beats token price.** Wall-clock and context cost scale with subagent turns; cheapest models routinely take 2-3× turns on multi-step work — cost more overall. Implementers write code from behavior specs and test-case data, not transcribe it: mid-tier model = floor for implementers and reviewers. Cheapest tier only for single-file mechanical fixes with a named covering test.
 
-**Task complexity signals (implementation tasks):** - 1-2 files, complete spec → cheap model - Multi-file, integration concerns → standard model - Design judgment or broad codebase understanding → most capable model
+**Task complexity signals (implementation tasks):** - 1-2 files, fully specified behavior + test cases → mid-tier model - Multi-file, integration concerns → standard model - Design judgment or broad codebase understanding → most capable model
 
 ## Handling Implementer Status
 
@@ -118,6 +118,12 @@ Implementer reports one of four statuses:
 
 Task reviewer may report "⚠️ Cannot verify from diff" items — requirements in unchanged code or spanning tasks. Don't block rest of review, but resolve each yourself before marking task complete: you hold plan and cross-task context reviewer lacks. Confirmed real gap = failed spec review — send back to implementer, re-review.
 
+## Plan Amendments
+
+Any decision that contradicts or extends the plan — an answer to an implementer question, resolution of a plan-mandated finding, a BLOCKED caused by wrong plan text, a changed interface — edit the affected task file (and Global Constraints or spec if they carry it) **before continuing**, then append to ledger: `Task N: plan amended — <one line>`. When a signature or shared value changes, grep the old symbol across the whole `plan/` directory and update every occurrence (see writing-plans drift procedure).
+
+Why: later task files and the final whole-branch reviewer read the plan. Stale plan = review against false requirements, and the next fresh subagent reads text you already overruled.
+
 ## Constructing Reviewer Prompts
 
 Per-task reviews = task-scoped gates. Broad review happens once, at final whole-branch review. Filling reviewer template:
@@ -131,6 +137,7 @@ Per-task reviews = task-scoped gates. Broad review happens once, at final whole-
 - Dispatch fix subagents for Critical and Important findings. Record Minor findings in progress ledger as you go; point final whole-branch review at that list to triage which must fix before merge. Roll-up nobody reads = silent discard.
 - Finding labeled plan-mandated — or any finding conflicting with plan text — is human's decision, like any plan contradiction: present finding + plan text, ask which governs. No dismissing finding because plan mandates it; no dispatching fix that contradicts plan without asking.
 - Final whole-branch review gets package too: run `scripts/review-package PLAN_FILE MERGE_BASE HEAD` (MERGE\_BASE = commit branch started from, e.g. `git merge-base main HEAD`), include printed path in final review dispatch — final reviewer reads one file, no re-deriving branch diff with git.
+- Final review dispatch also names project's full test suite command. Final reviewer runs suite independently — only independent execution in pipeline; every earlier test result is implementer self-report. Verdict without own test run (or explicit statement it could not run) = incomplete review.
 - Every fix dispatch carries implementer contract: fix subagent re-runs tests covering its change, reports results. Name covering test files in dispatch — one-line fix no need whole suite. Before re-dispatching reviewer, confirm fix report contains covering tests, command run, output; dispatch re-review once all three present.
 - Final whole-branch review returns findings → dispatch ONE fix subagent with complete findings list — not one fixer per finding. Per-finding fixers each rebuild context, re-run suites; real session's final-review fix wave cost more than all its tasks combined.
 
@@ -140,7 +147,7 @@ Everything pasted into dispatch prompt — and everything subagent prints back �
 
 - **Task brief:** plan's task file (`plan/tasks/task.NN.md`) *is* brief — self-contained, no extract or copy. No reading task body into own context; hand path to implementer, subagent reads. Dispatch contains:
   (1) one line where task fits in project; (2) task-file path, introduced as "read this first --- it is your requirements, with the exact values to use verbatim"; (3) interfaces and decisions from earlier tasks task file cannot know; (4) your resolution of any ambiguity (if you had to open file); (5) report-file path and report contract. Exact values (numbers, magic strings, signatures, test cases) live in task file.
-- **Report file:** name implementer's report file after task file (task `…/plan/tasks/task.0N.md` → report `…/sdd/task-N-report.md`), put in dispatch prompt. Implementer writes full report there, returns only status, commits, one-line test summary, concerns.
+- **Report file:** name implementer's report file after task file, same zero-padded number (task `…/plan/tasks/task.NN.md` → report `…/sdd/task-NN-report.md`), put in dispatch prompt. Implementer writes full report there, returns only status, commits, one-line test summary, concerns.
 - **Reviewer inputs:** task reviewer gets three paths — same task file, report file, review package — plus global constraints binding task.
 - Fix dispatches append fix report (with test results) to same report file, return short summary; re-reviews read updated file.
 
@@ -148,7 +155,7 @@ Everything pasted into dispatch prompt — and everything subagent prints back �
 
 Conversation memory no survive compaction. Real sessions: controllers that lost place re-dispatched entire completed task sequences — single most expensive failure observed. Track progress in ledger file, not only todos.
 
-- Ledger lives in run's workspace — `progress.md` inside directory `scripts/sdd-workspace PLAN_FILE` prints (PLAN\_FILE = plan index path). Directory = `sdd/` sibling of plan's folder: `$HOME/.superpowers/YYYY/<feature-name>/sdd/`, outside repo — shared across git worktrees, survives `git clean`.
+- Ledger lives in run's workspace — `progress.md` inside directory `scripts/sdd-workspace PLAN_FILE` prints (PLAN\_FILE = plan index path). Directory = `sdd/` sibling of plan's folder: `$HOME/.superpowers/YYYY/<feature-name>/sdd/` (`YYYY` = current year, e.g. `2026` — never literal `YYYY`), outside repo — shared across git worktrees, survives `git clean`.
 - At skill start, check for ledger: `cat "$(scripts/sdd-workspace PLAN_FILE)/progress.md"`. Tasks marked complete there = DONE — no re-dispatch; resume at first task not marked complete.
 - Task review comes back clean → append one ledger line in same message as other bookkeeping: `Task N: complete (commits <base7>..<head7>, review clean)`.
 - Ledger = recovery map: commits it names exist in git even when context no longer remembers creating them. After compaction, trust ledger and `git log` over own recollection.
@@ -168,7 +175,7 @@ Conversation memory no survive compaction. Real sessions: controllers that lost 
 
   Task 1: Hook installation script
 
-  [Dispatch implementer with the task-file path (…/plan/tasks/task.00.md) + report path + context]
+  [Dispatch implementer with the task-file path (…/plan/tasks/task.01.md) + report path + context]
 
   Implementer: "Before I begin - should the hook be installed at user or system level?"
 
@@ -189,7 +196,7 @@ Conversation memory no survive compaction. Real sessions: controllers that lost 
 
   Task 2: Recovery modes
 
-  [Dispatch implementer with the task-file path (…/plan/tasks/task.01.md) + report path + context]
+  [Dispatch implementer with the task-file path (…/plan/tasks/task.02.md) + report path + context]
 
   Implementer: [No questions, proceeds]
   Implementer:
@@ -234,7 +241,7 @@ Conversation memory no survive compaction. Real sessions: controllers that lost 
 
 ## Red Flags
 
-**Never:** - Start implementation on main/master branch without explicit user consent - Skip task review, or accept report missing either verdict (spec compliance AND task quality both required) - Proceed with unfixed issues - Dispatch multiple implementation subagents in parallel (conflicts) - Read all task files into own context (read index only; hand each subagent its task-file path, let it read own task) - Make subagent read whole plan (hand single task-file path instead) - Skip scene-setting context (subagent needs where task fits) - Ignore subagent questions (answer before they proceed) - Accept "close enough" on spec compliance (reviewer found spec issues = not done) - Skip review loops (reviewer found issues = implementer fixes = review again) - Let implementer self-review replace actual review (both needed) - Tell reviewer what not to flag, or pre-rate finding severity in dispatch prompt ("treat it as Minor at most") — plan's example code = starting point, not evidence its weaknesses were chosen - Dispatch task reviewer without diff file — generate first (`scripts/review-package PLAN_FILE BASE HEAD`), name printed path in prompt - Move to next task while review has open Critical/Important issues - Re-dispatch task progress ledger already marks complete — check ledger (and `git log`) after any compaction or resume
+**Never:** - Start implementation on main/master branch without explicit user consent - Skip task review, or accept report missing either verdict (spec compliance AND task quality both required) - Proceed with unfixed issues - Dispatch multiple implementation subagents in parallel — they share one working tree and HEAD, so commits and test runs trample each other, and the review gate is sequential by design (each task reviewed before the next builds on it) - Read all task files into own context (read index only; hand each subagent its task-file path, let it read own task) - Make subagent read whole plan (hand single task-file path instead) - Skip scene-setting context (subagent needs where task fits) - Ignore subagent questions (answer before they proceed) - Accept "close enough" on spec compliance (reviewer found spec issues = not done) - Skip review loops (reviewer found issues = implementer fixes = review again) - Let implementer self-review replace actual review (both needed) - Tell reviewer what not to flag, or pre-rate finding severity in dispatch prompt ("treat it as Minor at most") — plan's example code = starting point, not evidence its weaknesses were chosen - Dispatch task reviewer without diff file — generate first (`scripts/review-package PLAN_FILE BASE HEAD`), name printed path in prompt - Move to next task while review has open Critical/Important issues - Re-dispatch task progress ledger already marks complete — check ledger (and `git log`) after any compaction or resume - Resolve a plan contradiction verbally without editing the plan files — the next subagent reads the stale text (see Plan Amendments)
 
 **If subagent asks questions:** - Answer clear and complete - Provide extra context if needed - No rushing into implementation
 
