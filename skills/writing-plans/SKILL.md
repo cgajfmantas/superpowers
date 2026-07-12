@@ -9,11 +9,11 @@ disable-model-invocation: true
 
 ## Overview
 
-Write comprehensive implementation plans from a spec file assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
+Write full implementation plans from spec file. Assume engineer has zero codebase context, questionable taste. Document everything: files to touch per task, code, testing, docs to check, how to test. Bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
 
-Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
+Assume skilled developer, but knows almost nothing about toolset or problem domain. Assume weak test design knowledge.
 
-User provides the spec file [SPEC_FILE_PATH] = $0.
+User provides spec file [SPEC_FILE_PATH] = $0.
 
 **Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
 
@@ -23,39 +23,37 @@ User provides the spec file [SPEC_FILE_PATH] = $0.
 
 **Save the plan index to:** [PLAN_FILE_PATH]
 
-The plan lives in the `plan/` subfolder of the feature's directory
-(`/home/hermes/.superpowers/YYYY/<feature-name>/`), beside the `spec/` the
-brainstorming skill wrote and the `sdd/` execution artifacts land in.
+Plan lives in `plan/` subfolder of feature directory (`/home/hermes/.superpowers/YYYY/<feature-name>/`), beside `spec/` from brainstorming skill and `sdd/` execution artifacts.
 
-A plan is split across files so no single file grows unwieldy:
+Plan split across files so no single file grows unwieldy:
 
-- **[PLAN_FILE_PATH]** (`plan/plan.md`) is the *index*. It holds the plan header, Global Constraints, File Structure, and an ordered list of links to the task files. It does **not** contain task bodies.
-- **Each task lives in its own file** under `plan/tasks/` (see Task Structure for naming and layout).
+- **[PLAN_FILE_PATH]** (`plan/plan.md`) is *index*. Holds plan header, Global Constraints, File Structure, ordered links to task files. **No** task bodies.
+- **Each task in own file** under `plan/tasks/` (see Task Structure for naming, layout).
 
-The index lists the task files in execution order under a `## Tasks` heading (see Plan Index Header).
+Index lists task files in execution order under `## Tasks` heading (see Plan Index Header).
 
 ## Scope Check
 
-If the spec [SPEC_FILE_PATH] covers multiple independent subsystems, it should have been broken into sub-project specs during brainstorming. If it wasn't, suggest breaking this into separate plans — one per subsystem. Each plan should produce working, testable software on its own.
+If spec [SPEC_FILE_PATH] covers multiple independent subsystems, should have been broken into sub-project specs during brainstorming. If not, suggest separate plans — one per subsystem. Each plan must produce working, testable software alone.
 
 ## File Structure
 
-Before defining tasks, map out which files will be created or modified and what each one is responsible for. This is where decomposition decisions get locked in.
+Before defining tasks, map files created/modified and each one's responsibility. Decomposition decisions lock in here.
 
-- Design units with clear boundaries and well-defined interfaces. Each file should have one clear responsibility.
-- You reason best about code you can hold in context at once, and your edits are more reliable when files are focused. Prefer smaller, focused files over large ones that do too much.
-- Files that change together should live together. Split by responsibility, not by technical layer.
-- In existing codebases, follow established patterns. If the codebase uses large files, don't unilaterally restructure - but if a file you're modifying has grown unwieldy, including a split in the plan is reasonable.
+- Design units with clear boundaries, well-defined interfaces. One clear responsibility per file.
+- You reason best about code held in context at once; edits more reliable on focused files. Prefer smaller focused files over large ones.
+- Files that change together live together. Split by responsibility, not technical layer.
+- Existing codebases: follow established patterns. Codebase uses large files — don't unilaterally restructure. But if file you modify grew unwieldy, split in plan reasonable.
 
-This structure informs the task decomposition. Each task should produce self-contained changes that make sense independently.
+Structure informs task decomposition. Each task produces self-contained changes that make sense independently.
 
 ## Task Right-Sizing
 
-A task is the smallest unit that carries its own test cycle and is worth a fresh reviewer's gate. When drawing task boundaries: fold setup, configuration, scaffolding, and documentation steps into the task whose deliverable needs them; split only where a reviewer could meaningfully reject one task while approving its neighbor. Each task ends with an independently testable deliverable.
+Task = smallest unit with own test cycle, worth fresh reviewer's gate. Drawing boundaries: fold setup, configuration, scaffolding, docs into task whose deliverable needs them; split only where reviewer could reject one task, approve neighbor. Each task ends with independently testable deliverable.
 
 ## Bite-Sized Task Granularity
 
-**Each step is one action (2-5 minutes):**
+**Each step one action (2-5 minutes):**
 - "Write the failing test" - step
 - "Run it to make sure it fails" - step
 - "Implement the minimal code to make the test pass" - step
@@ -64,8 +62,7 @@ A task is the smallest unit that carries its own test cycle and is worth a fresh
 
 ## Plan Index Header
 
-**The index file [PLAN_FILE_PATH] MUST start with this header, followed by
-the ordered task list:**
+**Index file [PLAN_FILE_PATH] MUST start with this header, then ordered task list:**
 
 ```markdown
 # [Feature Name] Implementation Plan
@@ -90,9 +87,9 @@ the ordered task list:**
 
 ## Task Structure
 
-**Each task is saved to its own file** in the `plan/tasks/` folder beside the index, named `task.NN.md` (`NN` = zero-padded task number matching the index list: `00`, `01`, `02`, ...). One task block per file. The index (`plan/plan.md`) links these files in execution order (`./tasks/task.NN.md`) and holds no task bodies.
+**Each task saved to own file** in `plan/tasks/` beside index, named `task.NN.md` (`NN` = zero-padded task number matching index list: `00`, `01`, `02`, ...). One task block per file. Index (`plan/plan.md`) links files in execution order (`./tasks/task.NN.md`), holds no task bodies.
 
-A task file's reader has zero context and may read tasks out of order, so **each task file must be self-contained** — restate any Global Constraint, code, type, or signature it depends on rather than pointing at another file.
+Task file reader has zero context, may read out of order — **each task file must be self-contained**. Restate any Global Constraint, code, type, signature it depends on; no pointing at other files.
 
 ````markdown
 ### Task N: [Component Name]
@@ -167,11 +164,11 @@ After writing the complete plan, look at the spec with fresh eyes and check the 
 
 **3. Type consistency:** Do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
 
-If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a spec requirement with no task, add the task.
+Issues found: fix inline. No re-review — fix, move on. Spec requirement with no task: add task.
 
 **User Review Gate:**
-After the plan review loop passes, ask the user to review the written plan before proceeding:
+After plan review loop passes, ask user to review written plan before proceeding:
 
 > "Plan written and committed to [PLAN_FILE_PATH]. Review it and let me know if you want to make any changes."
 
-Wait for the user's response. If they request changes, make them and re-run the plan review loop. Only proceed once the user approves.
+Wait for user response. Changes requested: make them, re-run plan review loop. Proceed only after user approves.
