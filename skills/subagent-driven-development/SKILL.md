@@ -60,7 +60,7 @@ digraph process {
     label="Per Task";
     "Dispatch implementer subagent (./implementer-prompt.md)" [shape=box];
     "Implementer subagent asks questions?" [shape=diamond];
-    "Answer questions, provide context" [shape=box];
+    "Use ask tool if human decision needed; answer and provide context" [shape=box];
     "Implementer subagent implements, tests, commits, self-reviews" [shape=box];
     "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" [shape=box];
     "Task reviewer reports spec ✅ and quality approved?" [shape=diamond];
@@ -75,8 +75,8 @@ digraph process {
 
   "Read plan index only (task list + global constraints), create todos" -> "Dispatch implementer subagent (./implementer-prompt.md)";
   "Dispatch implementer subagent (./implementer-prompt.md)" -> "Implementer subagent asks questions?";
-  "Implementer subagent asks questions?" -> "Answer questions, provide context" [label="yes"];
-  "Answer questions, provide context" -> "Dispatch implementer subagent (./implementer-prompt.md)";
+  "Implementer subagent asks questions?" -> "Use ask tool if human decision needed; answer and provide context" [label="yes"];
+  "Use ask tool if human decision needed; answer and provide context" -> "Dispatch implementer subagent (./implementer-prompt.md)";
   "Implementer subagent asks questions?" -> "Implementer subagent implements, tests, commits, self-reviews" [label="no"];
   "Implementer subagent implements, tests, commits, self-reviews" -> "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)";
   "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" -> "Task reviewer reports spec ✅ and quality approved?";
@@ -100,6 +100,19 @@ No reading every task file upfront — index catches plan-level conflicts; per-t
 
 Present findings to human as one batched question — each finding beside plan text mandating it, ask which governs — before execution, not one interrupt per discovery mid-plan. Clean scan → proceed silent.
 
+## Per-Task Entry Gate
+
+Before dispatching each implementer, verify all six invariants:
+
+1. Previous task has both an approved spec verdict and an approved quality verdict.
+2. No Critical or Important finding remains unresolved.
+3. Ledger task state and recorded commit ranges agree with `git log`.
+4. Relevant active lessons are included in this task's dispatch context.
+5. Every decision that changed requirements is persisted through Plan Amendments.
+6. Record `HEAD` and `git status --short`; identify pre-existing changes and do not let the task overwrite or absorb them.
+
+Gate failure means resolve the mismatch before dispatch. After the implementer returns, compare `HEAD`, `git status --short`, and the task range against the snapshot. Every new change must belong to the assigned task; unrelated pre-existing changes must remain untouched. Generate `review-package` only after this scope check, because it packages committed changes and cannot expose unrelated uncommitted edits.
+
 ## Model Selection
 
 Use least powerful model that handles each role. Cheaper, faster.
@@ -122,7 +135,7 @@ Use least powerful model that handles each role. Cheaper, faster.
 
 Implementer reports one of four statuses:
 
-**DONE:** Generate review package (`scripts/review-package PLAN_FILE BASE HEAD`, from this skill's directory — PLAN\_FILE = plan index path, locates feature's `sdd/` workspace; prints unique file path it wrote; BASE = commit recorded before dispatching implementer — never `HEAD~1`, which silently drops all but last commit of multi-commit task), then dispatch task reviewer with printed path.
+**DONE:** Treat status as a report, not proof of completion. First perform the post-task scope check from Per-Task Entry Gate. Then generate review package (`scripts/review-package PLAN_FILE BASE HEAD`, from this skill's directory — PLAN\_FILE = plan index path, locates feature's `sdd/` workspace; prints unique file path it wrote; BASE = commit recorded before dispatching implementer — never `HEAD~1`, which silently drops all but last commit of multi-commit task), and dispatch task reviewer with printed path.
 
 **DONE\_WITH\_CONCERNS:** Work complete, doubts flagged. Read concerns before proceeding. Correctness or scope concerns → address before review. Observations (e.g., "this file is getting large") → note, proceed to review.
 
@@ -177,6 +190,33 @@ Conversation memory no survive compaction. Real sessions: controllers that lost 
 - At skill start, check for ledger: `cat "$(scripts/sdd-workspace PLAN_FILE)/progress.md"`. Tasks marked complete there = DONE — no re-dispatch; resume at first task not marked complete.
 - Task review comes back clean → append one ledger line in same message as other bookkeeping: `Task N: complete (commits <base7>..<head7>, review clean)`.
 - Ledger = recovery map: commits it names exist in git even when context no longer remembers creating them. After compaction, trust ledger and `git log` over own recollection.
+
+### Lessons Learned
+
+Record only actionable lessons supported by evidence. Use this ledger shape:
+
+```text
+Lesson: <observation>
+Evidence: <test, diff, failure, or reviewer finding>
+Impact: <later tasks or final review affected>
+Action: <context, constraint, or plan amendment required>
+Status: active | incorporated | superseded
+```
+
+Before every dispatch and final review, read active lessons and pass only relevant ones as context. A lesson never overrides the plan: contradiction or extension means Plan Amendments first. Mark it `incorporated` when its action is persisted or completed; retain superseded entries for traceability.
+
+## Formal Task Completion Contract
+
+Subagent status is a report, not evidence of completion. Mark a task complete only when all artifacts establish:
+
+- Requirements trace to the implementation and declared task test cases.
+- The report records RED and GREEN evidence when the task brief declares test cases, plus all verification commands and results.
+- The task reviewer independently returns separate approved verdicts for specification compliance and code quality. These are two verdicts from the task review gate, not necessarily two reviewer subagents.
+- No Critical or Important finding remains open; required fixes have covering test evidence and clean re-review.
+- The ledger records the verified commit range, clean review, and any actionable lessons.
+- The post-task scope check confirms unrelated and pre-existing working-tree changes were not absorbed or modified.
+
+Missing evidence means the task remains open even when the implementation appears correct.
 
 ## Prompt Templates
 
