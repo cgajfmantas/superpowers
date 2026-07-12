@@ -23,13 +23,13 @@ Every project goes through this process. A todo list, a single-function utility,
 
 ## SPEC_FILE_PATH
 
-`/home/hermes/.superpowers/YYYY/<feature-name>/spec/<feature-name>.spec.md`
+`/home/hermes/.superpowers/YYYY/<feature-name>/spec/spec.md`
 
 A feature owns one directory — `/home/hermes/.superpowers/YYYY/<feature-name>/` —
 holding everything about it in sibling subfolders: `spec/`, `plan/`, and
-`sdd/`. The spec goes in `spec/`; the plan and its task files land in
-`plan/` (see superpowers:writing-plans); SDD execution artifacts land in
-`sdd/`.
+`sdd/`. The spec goes in `spec/spec.md`; the plan (`plan/plan.md`) and its
+task files (`plan/tasks/task.NN.md`) land in `plan/` (see
+superpowers:writing-plans); SDD execution artifacts land in `sdd/`.
 
 ## Checklist
 

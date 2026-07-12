@@ -17,7 +17,7 @@ User provides the spec file [SPEC_FILE_PATH] = $0.
 
 ## PLAN_FILE_PATH
 
-`/home/hermes/.superpowers/YYYY/<feature-name>/plan/<feature-name>.plan.md`
+`/home/hermes/.superpowers/YYYY/<feature-name>/plan/plan.md`
 
 **Save the plan index to:** [PLAN_FILE_PATH]
 
@@ -27,8 +27,8 @@ brainstorming skill wrote and the `sdd/` execution artifacts land in.
 
 A plan is split across files so no single file grows unwieldy:
 
-- **[PLAN_FILE_PATH]** is the *index*. It holds the plan header, Global Constraints, File Structure, and an ordered list of links to the task files. It does **not** contain task bodies.
-- **Each task lives in its own file** in the same `plan/` folder (see Task Structure for naming and layout).
+- **[PLAN_FILE_PATH]** (`plan/plan.md`) is the *index*. It holds the plan header, Global Constraints, File Structure, and an ordered list of links to the task files. It does **not** contain task bodies.
+- **Each task lives in its own file** under `plan/tasks/` (see Task Structure for naming and layout).
 
 The index lists the task files in execution order under a `## Tasks` heading (see Plan Index Header).
 
@@ -80,15 +80,15 @@ the ordered task list:**
 
 ## Tasks
 
-1. [Task 0: ...](./<feature-name>.plan.task.00.md)
-2. [Task 1: ...](./<feature-name>.plan.task.01.md)
+1. [Task 0: ...](./tasks/task.00.md)
+2. [Task 1: ...](./tasks/task.01.md)
 
 ---
 ```
 
 ## Task Structure
 
-**Each task is saved to its own file** in the same `plan/` folder as the index, named `<feature-name>.plan.task.NN.md` (`NN` = zero-padded task number matching the index list: `00`, `01`, `02`, ...). One task block per file. The index ([PLAN_FILE_PATH]) links these files in execution order and holds no task bodies.
+**Each task is saved to its own file** in the `plan/tasks/` folder beside the index, named `task.NN.md` (`NN` = zero-padded task number matching the index list: `00`, `01`, `02`, ...). One task block per file. The index (`plan/plan.md`) links these files in execution order (`./tasks/task.NN.md`) and holds no task bodies.
 
 A task file's reader has zero context and may read tasks out of order, so **each task file must be self-contained** — restate any Global Constraint, code, type, or signature it depends on rather than pointing at another file.
 

@@ -13,7 +13,7 @@ Subagent (general-purpose):
     ## Task Description
 
     Read your task brief first: [BRIEF_FILE]
-    It is the plan's task file (`*.plan.task.NN.md`) and contains the full, self-contained task text.
+    It is the plan's task file (`plan/tasks/task.NN.md`) and contains the full, self-contained task text.
 
     ## Context
 

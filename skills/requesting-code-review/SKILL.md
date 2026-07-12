@@ -57,7 +57,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 [Dispatch code reviewer subagent]
   DESCRIPTION: Added verifyIndex() and repairIndex() with 4 issue types
-  PLAN_OR_REQUIREMENTS: Task 2 from /home/hermes/.superpowers/2026/deployment/plan/deployment.plan.task.02.md
+  PLAN_OR_REQUIREMENTS: Task 2 from /home/hermes/.superpowers/2026/deployment/plan/tasks/task.02.md
   BASE_SHA: a7981ec
   HEAD_SHA: 3df7661
 

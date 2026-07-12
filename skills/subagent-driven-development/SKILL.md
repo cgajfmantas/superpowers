@@ -227,7 +227,7 @@ Everything you paste into a dispatch prompt — and everything a subagent
 prints back — stays resident in your context for the rest of the session
 and is re-read on every later turn. Hand artifacts over as files:
 
-- **Task brief:** the plan's task file (`*.plan.task.NN.md`) *is* the
+- **Task brief:** the plan's task file (`plan/tasks/task.NN.md`) *is* the
   brief — it is self-contained, so you do not extract or copy it. Do not
   read the task body into your own context; hand its path to the
   implementer and let the subagent read it. Your dispatch should contain:
@@ -239,7 +239,7 @@ and is re-read on every later turn. Hand artifacts over as files:
   Exact values (numbers, magic strings, signatures, test cases) live in the
   task file.
 - **Report file:** name the implementer's report file after the task file
-  (task `…/<name>.plan.task.0N.md` → report `…/task-N-report.md`) and put
+  (task `…/plan/tasks/task.0N.md` → report `…/sdd/task-N-report.md`) and put
   it in the dispatch prompt. The implementer writes the full report there
   and returns only status, commits, a one-line test summary, and concerns.
 - **Reviewer inputs:** the task reviewer gets three paths — the same task
@@ -282,12 +282,12 @@ a ledger file, not only in todos.
 ```
 You: I'm using Subagent-Driven Development to execute this plan.
 
-[Read plan index only: /home/hermes/.superpowers/2026/feature/plan/feature.plan.md]
+[Read plan index only: /home/hermes/.superpowers/2026/feature/plan/plan.md]
 [Create todos from the index task list]
 
 Task 1: Hook installation script
 
-[Dispatch implementer with the task-file path (…plan.task.00.md) + report path + context]
+[Dispatch implementer with the task-file path (…/plan/tasks/task.00.md) + report path + context]
 
 Implementer: "Before I begin - should the hook be installed at user or system level?"
 
@@ -308,7 +308,7 @@ Task reviewer: Spec ✅ - all requirements met, nothing extra.
 
 Task 2: Recovery modes
 
-[Dispatch implementer with the task-file path (…plan.task.01.md) + report path + context]
+[Dispatch implementer with the task-file path (…/plan/tasks/task.01.md) + report path + context]
 
 Implementer: [No questions, proceeds]
 Implementer:

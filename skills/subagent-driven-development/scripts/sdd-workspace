@@ -7,8 +7,9 @@
 # spec and plan layout:
 #
 #   $HOME/.superpowers/<YYYY>/<feature-name>/
-#     spec/<feature-name>.spec.md
-#     plan/<feature-name>.plan.md      (index + *.plan.task.NN.md task files)
+#     spec/spec.md
+#     plan/plan.md                     (index)
+#     plan/tasks/task.NN.md            (one task per file)
 #     sdd/                             (this workspace)
 #
 # The workspace is the `sdd/` sibling of the plan's directory, derived from
@@ -19,7 +20,7 @@
 # when work moves between them.
 #
 # Usage: sdd-workspace PLAN_FILE
-#   PLAN_FILE is the plan index path (…/<feature-name>/plan/<name>.plan.md).
+#   PLAN_FILE is the plan index path (…/<feature-name>/plan/plan.md).
 set -euo pipefail
 
 if [ $# -ne 1 ]; then
