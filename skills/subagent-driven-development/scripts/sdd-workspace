@@ -1,22 +1,33 @@
 #!/usr/bin/env bash
-# Resolve and ensure the working-tree directory SDD uses for its short-lived
-# artifacts: implementer reports, review packages, and the
-# progress ledger. Print the directory's absolute path.
+# Resolve and ensure the directory SDD uses for its short-lived artifacts:
+# implementer reports, review packages, and the progress ledger. Print the
+# directory's absolute path.
 #
-# The workspace lives in the working tree (not under .git/) because Claude Code
-# treats .git/ as a protected path and denies agent writes there — which blocks
-# an implementer subagent from writing its report file. A self-ignoring
-# .gitignore keeps the workspace out of `git status` and out of accidental
-# commits without modifying any tracked file.
+# The workspace lives under $HOME/.superpowers/sdd/YYYY/<feature-slug>/,
+# mirroring where spec and plan files live (…/.superpowers/plans/YYYY/
+# YYYY-MM-DD-<feature-name>.plan.md). Keeping it outside the repo means it
+# is never touched by `git status`, `git clean`, or Claude Code's .git/
+# write protection, and one stable location is shared across git worktrees
+# so the progress ledger survives when work moves between them.
 #
-# Single source of truth for the workspace location, so review-package and
-# report files cannot drift to different directories.
+# FEATURE_SLUG is the plan filename stem — YYYY-MM-DD-<feature-name> — so a
+# run's artifacts sit beside nothing but its own. The leading YYYY becomes
+# the year directory.
 #
-# Usage: sdd-workspace
+# Usage: sdd-workspace FEATURE_SLUG
 set -euo pipefail
 
-root=$(git rev-parse --show-toplevel)
-dir="$root/.superpowers/sdd"
+if [ $# -ne 1 ]; then
+  echo "usage: sdd-workspace FEATURE_SLUG   (e.g. 2026-07-12-my-feature)" >&2
+  exit 2
+fi
+
+slug=$1
+case "$slug" in
+  [0-9][0-9][0-9][0-9]-*) year=${slug%%-*} ;;
+  *) echo "FEATURE_SLUG must start with a year: YYYY-MM-DD-<feature-name>" >&2; exit 2 ;;
+esac
+
+dir="${HOME}/.superpowers/sdd/${year}/${slug}"
 mkdir -p "$dir"
-printf '*\n' > "$dir/.gitignore"
-cd "$dir" && pwd
+printf '%s\n' "$dir"

@@ -138,7 +138,7 @@ that implementer. Single-file mechanical fixes also take the cheapest tier.
 
 Implementer subagents report one of four statuses. Handle each appropriately:
 
-**DONE:** Generate the review package (`scripts/review-package BASE HEAD`, from this skill's directory — it prints the unique file path it wrote; BASE is the commit you recorded before dispatching the implementer — never `HEAD~1`, which silently drops all but the last commit of a multi-commit task), then dispatch the task reviewer with the printed path.
+**DONE:** Generate the review package (`scripts/review-package FEATURE BASE HEAD`, from this skill's directory — FEATURE is the plan filename stem `YYYY-MM-DD-<feature-name>`; it prints the unique file path it wrote; BASE is the commit you recorded before dispatching the implementer — never `HEAD~1`, which silently drops all but the last commit of a multi-commit task), then dispatch the task reviewer with the printed path.
 
 **DONE_WITH_CONCERNS:** The implementer completed the work but flagged doubts. Read the concerns before proceeding. If the concerns are about correctness or scope, address them before review. If they're observations (e.g., "this file is getting large"), note them and proceed to review.
 
@@ -184,8 +184,8 @@ final whole-branch review. When you fill a reviewer template:
   test hygiene, review method) — the constraints block is for what THIS
   project's spec demands.
 - Hand the reviewer its diff as a file: run this skill's
-  `scripts/review-package BASE HEAD` and pass the reviewer the file path
-  it prints (or, without bash: `git log --oneline`, `git diff --stat`,
+  `scripts/review-package FEATURE BASE HEAD` and pass the reviewer the file
+  path it prints (or, without bash: `git log --oneline`, `git diff --stat`,
   and `git diff -U10` for the range, redirected to one uniquely named
   file). The output never enters your own context, and the reviewer sees
   the commit list, stat summary, and full diff with context in one Read
@@ -206,7 +206,7 @@ final whole-branch review. When you fill a reviewer template:
   Do not dismiss the finding because the plan mandates it, and do not
   dispatch a fix that contradicts the plan without asking.
 - The final whole-branch review gets a package too: run
-  `scripts/review-package MERGE_BASE HEAD` (MERGE_BASE = the commit the
+  `scripts/review-package FEATURE MERGE_BASE HEAD` (MERGE_BASE = the commit the
   branch started from, e.g. `git merge-base main HEAD`) and include the
   printed path in the final review dispatch, so the final reviewer reads
   one file instead of re-deriving the branch diff with git commands.
@@ -255,8 +255,13 @@ controllers that lost their place have re-dispatched entire completed task
 sequences — the single most expensive failure observed. Track progress in
 a ledger file, not only in todos.
 
+- The ledger lives in the run's workspace — `progress.md` inside the
+  directory `scripts/sdd-workspace FEATURE` prints (FEATURE = the plan
+  filename stem `YYYY-MM-DD-<feature-name>`). That directory is
+  `$HOME/.superpowers/sdd/YYYY/<feature-slug>/`, outside the repo, so it is
+  shared across git worktrees and survives `git clean`.
 - At skill start, check for a ledger:
-  `cat "$(git rev-parse --show-toplevel)/.superpowers/sdd/progress.md"`. Tasks listed there
+  `cat "$(scripts/sdd-workspace FEATURE)/progress.md"`. Tasks listed there
   as complete are DONE — do not re-dispatch them; resume at the first task
   not marked complete.
 - When a task's review comes back clean, append one line to the ledger in
@@ -265,8 +270,6 @@ a ledger file, not only in todos.
 - The ledger is your recovery map: the commits it names exist in git even
   when your context no longer remembers creating them. After compaction,
   trust the ledger and `git log` over your own recollection.
-- `git clean -fdx` will destroy the ledger (it's git-ignored scratch); if
-  that happens, recover from `git log`.
 
 ## Prompt Templates
 
@@ -389,7 +392,7 @@ Done!
   dispatch prompt ("treat it as Minor at most") — the plan's example code is
   a starting point, not evidence that its weaknesses were chosen
 - Dispatch a task reviewer without a diff file — generate it first
-  (`scripts/review-package BASE HEAD`) and name the printed path in the
+  (`scripts/review-package FEATURE BASE HEAD`) and name the printed path in the
   prompt
 - Move to next task while the review has open Critical/Important issues
 - Re-dispatch a task the progress ledger already marks complete — check
