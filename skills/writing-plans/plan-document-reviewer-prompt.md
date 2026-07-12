@@ -1,10 +1,10 @@
 # Plan Document Reviewer Prompt Template
 
-Use this template when dispatching a plan document reviewer subagent.
+Use template when dispatch plan document reviewer subagent.
 
-**Purpose:** Verify the plan is complete, matches the spec, and has proper task decomposition.
+**Purpose:** Verify plan complete, match spec, task decomposition proper.
 
-**Dispatch after:** The complete plan is written.
+**Dispatch after:** Complete plan written.
 
 ```
 Subagent (general-purpose):
@@ -30,8 +30,7 @@ Subagent (general-purpose):
     An implementer building the wrong thing or getting stuck is an issue.
     Minor wording, stylistic preferences, and "nice to have" suggestions are not.
 
-    Approve unless there are serious gaps — missing requirements from the spec,
-    contradictory steps, placeholder content, or tasks so vague they can't be acted on.
+    Approve unless there are serious gaps — missing requirements from the spec, contradictory steps, placeholder content, or tasks so vague they can't be acted on.
 
     ## Output Format
 
