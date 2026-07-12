@@ -1,5 +1,4 @@
-Subagent-Driven Development
-===========================
+# Subagent-Driven Development
 
 Execute plan: fresh implementer subagent per task, task review (spec + quality) after each, broad whole-branch review at end.
 
@@ -11,8 +10,7 @@ Execute plan: fresh implementer subagent per task, task review (spec + quality) 
 
 **Continuous execution:** No pause to check in with human between tasks. Execute all tasks without stopping. Stop only for: BLOCKED status unresolvable, ambiguity that truly prevents progress, or all tasks complete. "Should I continue?" prompts and progress summaries waste human time — plan execution was the ask, so execute.
 
-When to Use
------------
+## When to Use
 
 ```  {.dot}
 digraph when_to_use {
@@ -34,8 +32,7 @@ digraph when_to_use {
 
 **vs. Executing Plans (parallel session):** - Same session (no context switch) - Fresh subagent per task (no context pollution) - Review after each task (spec compliance + code quality), broad review at end - Faster iteration (no human-in-loop between tasks)
 
-The Process
------------
+## The Process
 
 ``` {.dot}
 digraph process {
@@ -75,8 +72,7 @@ digraph process {
 }
 ```
 
-Pre-Flight Plan Review
-----------------------
+## Pre-Flight Plan Review
 
 Before Task 1, scan plan index (task list + Global Constraints) for conflicts visible without task bodies:
 - task title or Global Constraints contradict each other
@@ -86,8 +82,7 @@ No reading every task file upfront — index catches plan-level conflicts; per-t
 
 Present findings to human as one batched question — each finding beside plan text mandating it, ask which governs — before execution, not one interrupt per discovery mid-plan. Clean scan → proceed silent.
 
-Model Selection
----------------
+## Model Selection
 
 Use least powerful model that handles each role. Cheaper, faster.
 
@@ -105,8 +100,7 @@ Use least powerful model that handles each role. Cheaper, faster.
 
 **Task complexity signals (implementation tasks):** - 1-2 files, complete spec → cheap model - Multi-file, integration concerns → standard model - Design judgment or broad codebase understanding → most capable model
 
-Handling Implementer Status
----------------------------
+## Handling Implementer Status
 
 Implementer reports one of four statuses:
 
@@ -120,13 +114,11 @@ Implementer reports one of four statuses:
 
 **Never** ignore escalation or force same model retry without changes. Implementer stuck = something must change.
 
-Handling Reviewer ⚠️ Items
---------------------------
+## Handling Reviewer ⚠️ Items
 
 Task reviewer may report "⚠️ Cannot verify from diff" items — requirements in unchanged code or spanning tasks. Don't block rest of review, but resolve each yourself before marking task complete: you hold plan and cross-task context reviewer lacks. Confirmed real gap = failed spec review — send back to implementer, re-review.
 
-Constructing Reviewer Prompts
------------------------------
+## Constructing Reviewer Prompts
 
 Per-task reviews = task-scoped gates. Broad review happens once, at final whole-branch review. Filling reviewer template:
 
@@ -142,8 +134,7 @@ Per-task reviews = task-scoped gates. Broad review happens once, at final whole-
 - Every fix dispatch carries implementer contract: fix subagent re-runs tests covering its change, reports results. Name covering test files in dispatch — one-line fix no need whole suite. Before re-dispatching reviewer, confirm fix report contains covering tests, command run, output; dispatch re-review once all three present.
 - Final whole-branch review returns findings → dispatch ONE fix subagent with complete findings list — not one fixer per finding. Per-finding fixers each rebuild context, re-run suites; real session's final-review fix wave cost more than all its tasks combined.
 
-File Handoffs
--------------
+## File Handoffs
 
 Everything pasted into dispatch prompt — and everything subagent prints back — stays resident in context rest of session, re-read every later turn. Hand artifacts as files:
 
@@ -153,8 +144,7 @@ Everything pasted into dispatch prompt — and everything subagent prints back �
 - **Reviewer inputs:** task reviewer gets three paths — same task file, report file, review package — plus global constraints binding task.
 - Fix dispatches append fix report (with test results) to same report file, return short summary; re-reviews read updated file.
 
-Durable Progress
-----------------
+## Durable Progress
 
 Conversation memory no survive compaction. Real sessions: controllers that lost place re-dispatched entire completed task sequences — single most expensive failure observed. Track progress in ledger file, not only todos.
 
@@ -163,15 +153,13 @@ Conversation memory no survive compaction. Real sessions: controllers that lost 
 - Task review comes back clean → append one ledger line in same message as other bookkeeping: `Task N: complete (commits <base7>..<head7>, review clean)`.
 - Ledger = recovery map: commits it names exist in git even when context no longer remembers creating them. After compaction, trust ledger and `git log` over own recollection.
 
-Prompt Templates
-----------------
+## Prompt Templates
 
 - [implementer-prompt.md](implementer-prompt.md) - Dispatch implementer subagent
 - [task-reviewer-prompt.md](task-reviewer-prompt.md) - Dispatch task reviewer subagent (spec compliance + code quality)
 - Final whole-branch review: use superpowers:requesting-code-review's [code-reviewer.md](../requesting-code-review/code-reviewer.md)
 
-Example Workflow
-----------------
+## Example Workflow
 
   You: I'm using Subagent-Driven Development to execute this plan.
 
@@ -232,8 +220,7 @@ Example Workflow
 
   Done!
 
-Advantages
-----------
+## Advantages
 
 **vs. Manual execution:** - Subagents follow TDD naturally - Fresh context per task (no confusion) - Parallel-safe (subagents no interfere) - Subagent can ask questions (before AND during work)
 
@@ -245,8 +232,7 @@ Advantages
 
 **Cost:** - More subagent invocations (implementer + reviewer per task) - Controller does more prep (per-task dispatch composition) - Review loops add iterations - But catches issues early (cheaper than debugging later)
 
-Red Flags
----------
+## Red Flags
 
 **Never:** - Start implementation on main/master branch without explicit user consent - Skip task review, or accept report missing either verdict (spec compliance AND task quality both required) - Proceed with unfixed issues - Dispatch multiple implementation subagents in parallel (conflicts) - Read all task files into own context (read index only; hand each subagent its task-file path, let it read own task) - Make subagent read whole plan (hand single task-file path instead) - Skip scene-setting context (subagent needs where task fits) - Ignore subagent questions (answer before they proceed) - Accept "close enough" on spec compliance (reviewer found spec issues = not done) - Skip review loops (reviewer found issues = implementer fixes = review again) - Let implementer self-review replace actual review (both needed) - Tell reviewer what not to flag, or pre-rate finding severity in dispatch prompt ("treat it as Minor at most") — plan's example code = starting point, not evidence its weaknesses were chosen - Dispatch task reviewer without diff file — generate first (`scripts/review-package PLAN_FILE BASE HEAD`), name printed path in prompt - Move to next task while review has open Critical/Important issues - Re-dispatch task progress ledger already marks complete — check ledger (and `git log`) after any compaction or resume
 
@@ -256,8 +242,7 @@ Red Flags
 
 **If subagent fails task:** - Dispatch fix subagent with specific instructions - No fixing manually (context pollution)
 
-Integration
------------
+## Integration
 
 **Required workflow skills:**
 - **superpowers:requesting-code-review** Code review template for final whole-branch review
