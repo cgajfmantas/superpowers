@@ -184,16 +184,9 @@ Issues found: fix inline. No re-review — fix, move on. Spec requirement with n
 
 ## Plan Review (subagent)
 
-After self-review passes, before the User Review Gate: dispatch one fresh reviewer subagent (general-purpose, read-only). Fresh eyes catch what the author cannot — this is the only review of the plan by someone who didn't write it.
+After self-review passes, before the User Review Gate: dispatch one fresh reviewer subagent using [plan-document-reviewer-prompt.md](plan-document-reviewer-prompt.md) with the spec path and plan index path. Fresh eyes catch what the author cannot — this is the only review of the plan by someone who didn't write it.
 
-Dispatch prompt contains: spec path, plan index path, instruction to read every task file under `plan/tasks/`, and these checks:
-
-1. **Spec coverage:** every spec requirement maps to a task; list gaps.
-2. **Placeholder scan:** any pattern from the No Placeholders list above.
-3. **Interface consistency:** signatures in Produces/Consumes blocks match across tasks.
-4. **Self-containment:** could a reader with zero context execute each task file alone? Name what's missing.
-
-Reviewer returns findings with file:line. Fix findings; re-dispatch only if any were Critical/Important.
+Reviewer returns Status + Issues with file references. Issues found: fix them, re-dispatch. Approved: proceed to user review.
 
 **User Review Gate:**
 After plan review loop passes, ask user to review written plan before proceeding:
