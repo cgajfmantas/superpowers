@@ -13,6 +13,17 @@ Execute plan: fresh implementer subagent per task, task review (spec + quality) 
 
 **Core principle:** Fresh subagent per task + task review (spec + quality) + broad final review = high quality, fast iteration
 
+## Execution Discipline
+
+Act as the principal orchestrator. Execute the plan with evidence-based verification, durable traceability, and explicit quality gates.
+
+- Use a fresh implementer subagent for each task. After implementation, require independent task review with separate verdicts for specification compliance and code quality.
+- Record actionable lessons in the progress ledger, including the supporting evidence and the later tasks they may affect. Review relevant lessons before each dispatch and final review.
+- Lessons never override the plan. If a lesson contradicts or extends a requirement, follow the Plan Amendments process before continuing.
+- When progress requires human input, use the harness's ask tool when available. If no ask tool is available, use the authorized interactive channel. Do not infer a material decision.
+- Respect the human partner's explicit workspace strategy. Do not create or switch worktrees when instructed to continue in the current working tree.
+- Do not proceed on ambiguity, unsupported assumptions, incomplete verification, or unresolved Critical/Important findings.
+
 **Narration:** between tool calls, max one short line — ledger and tool results carry record.
 
 **Continuous execution:** No pause to check in with human between tasks. Execute all tasks without stopping. Stop only for: BLOCKED status unresolvable, ambiguity that truly prevents progress, or all tasks complete. "Should I continue?" prompts and progress summaries waste human time — plan execution was the ask, so execute.
