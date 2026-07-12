@@ -4,19 +4,19 @@
 # call. Using the recorded per-task BASE (not HEAD~1) keeps multi-commit
 # tasks intact.
 #
-# Usage: review-package FEATURE_SLUG BASE HEAD [OUTFILE]
-# FEATURE_SLUG is the plan filename stem (YYYY-MM-DD-<feature-name>); it
-# selects the run's workspace via sdd-workspace.
+# Usage: review-package PLAN_FILE BASE HEAD [OUTFILE]
+# PLAN_FILE is the plan index path; it selects the run's workspace via
+# sdd-workspace (the sdd/ sibling of the plan's directory).
 # Default OUTFILE: <workspace>/review-<base7>..<head7>.diff
 # (named per range, so a re-review after fixes gets a distinct fresh file).
 set -euo pipefail
 
 if [ $# -lt 3 ] || [ $# -gt 4 ]; then
-  echo "usage: review-package FEATURE_SLUG BASE HEAD [OUTFILE]" >&2
+  echo "usage: review-package PLAN_FILE BASE HEAD [OUTFILE]" >&2
   exit 2
 fi
 
-slug=$1
+plan=$1
 base=$2
 head=$3
 
@@ -26,7 +26,7 @@ git rev-parse --verify --quiet "$head" >/dev/null || { echo "bad HEAD: $head" >&
 if [ $# -eq 4 ]; then
   out=$4
 else
-  dir=$("$(cd "$(dirname "$0")" && pwd)/sdd-workspace" "$slug")
+  dir=$("$(cd "$(dirname "$0")" && pwd)/sdd-workspace" "$plan")
   out="$dir/review-$(git rev-parse --short "$base")..$(git rev-parse --short "$head").diff"
 fi
 

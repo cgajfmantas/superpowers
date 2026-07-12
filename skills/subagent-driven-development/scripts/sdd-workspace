@@ -3,31 +3,35 @@
 # implementer reports, review packages, and the progress ledger. Print the
 # directory's absolute path.
 #
-# The workspace lives under $HOME/.superpowers/sdd/YYYY/<feature-slug>/,
-# mirroring where spec and plan files live (…/.superpowers/plans/YYYY/
-# YYYY-MM-DD-<feature-name>.plan.md). Keeping it outside the repo means it
-# is never touched by `git status`, `git clean`, or Claude Code's .git/
-# write protection, and one stable location is shared across git worktrees
-# so the progress ledger survives when work moves between them.
+# A feature owns one directory that holds everything about it, mirroring the
+# spec and plan layout:
 #
-# FEATURE_SLUG is the plan filename stem — YYYY-MM-DD-<feature-name> — so a
-# run's artifacts sit beside nothing but its own. The leading YYYY becomes
-# the year directory.
+#   $HOME/.superpowers/<YYYY>/<feature-name>/
+#     spec/<feature-name>.spec.md
+#     plan/<feature-name>.plan.md      (index + *.plan.task.NN.md task files)
+#     sdd/                             (this workspace)
 #
-# Usage: sdd-workspace FEATURE_SLUG
+# The workspace is the `sdd/` sibling of the plan's directory, derived from
+# the plan file path so there is no year or slug to parse or keep in sync.
+# It lives outside the repo, so it is never touched by `git status`,
+# `git clean`, or Claude Code's .git/ write protection, and one stable
+# location is shared across git worktrees — the progress ledger survives
+# when work moves between them.
+#
+# Usage: sdd-workspace PLAN_FILE
+#   PLAN_FILE is the plan index path (…/<feature-name>/plan/<name>.plan.md).
 set -euo pipefail
 
 if [ $# -ne 1 ]; then
-  echo "usage: sdd-workspace FEATURE_SLUG   (e.g. 2026-07-12-my-feature)" >&2
+  echo "usage: sdd-workspace PLAN_FILE" >&2
   exit 2
 fi
 
-slug=$1
-case "$slug" in
-  [0-9][0-9][0-9][0-9]-*) year=${slug%%-*} ;;
-  *) echo "FEATURE_SLUG must start with a year: YYYY-MM-DD-<feature-name>" >&2; exit 2 ;;
-esac
+plan=$1
+[ -f "$plan" ] || { echo "no such plan file: $plan" >&2; exit 2; }
 
-dir="${HOME}/.superpowers/sdd/${year}/${slug}"
+plan_dir=$(cd "$(dirname "$plan")" && pwd)   # …/<feature-name>/plan
+feature_dir=$(dirname "$plan_dir")           # …/<feature-name>
+dir="$feature_dir/sdd"
 mkdir -p "$dir"
 printf '%s\n' "$dir"
