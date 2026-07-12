@@ -40,8 +40,9 @@ MUST create task per item, complete in order:
 4. **Present design** — sections scaled to complexity, get approval — batch sections into one message unless design is long
 5. **Write design doc** — save to [SPEC_FILE_PATH], commit
 6. **Spec self-review** — quick inline check: placeholders, contradictions, ambiguity, scope (see below)
-7. **User reviews written spec** — user reviews spec file before proceeding
-8. **Transition to implementation** — invoke writing-plans skill for implementation plan
+7. **Spec review (subagent)** — dispatch fresh reviewer with [spec-document-reviewer-prompt.md](spec-document-reviewer-prompt.md), fix issues found
+8. **User reviews written spec** — user reviews spec file before proceeding
+9. **Transition to implementation** — invoke writing-plans skill for implementation plan
 
 ## Process Flow
 
@@ -54,6 +55,8 @@ digraph brainstorming {
     "User approves design?" [shape=diamond];
     "Write design doc" [shape=box];
     "Spec self-review\n(fix inline)" [shape=box];
+    "Dispatch spec reviewer subagent" [shape=box];
+    "Reviewer approves spec?" [shape=diamond];
     "User reviews spec?" [shape=diamond];
     "Invoke writing-plans skill" [shape=doublecircle];
 
@@ -64,7 +67,10 @@ digraph brainstorming {
     "User approves design?" -> "Present full design" [label="no, revise"];
     "User approves design?" -> "Write design doc" [label="yes"];
     "Write design doc" -> "Spec self-review\n(fix inline)";
-    "Spec self-review\n(fix inline)" -> "User reviews spec?";
+    "Spec self-review\n(fix inline)" -> "Dispatch spec reviewer subagent";
+    "Dispatch spec reviewer subagent" -> "Reviewer approves spec?";
+    "Reviewer approves spec?" -> "Write design doc" [label="issues found"];
+    "Reviewer approves spec?" -> "User reviews spec?" [label="approved"];
     "User reviews spec?" -> "Write design doc" [label="changes requested"];
     "User reviews spec?" -> "Invoke writing-plans skill" [label="approved"];
 }
@@ -127,6 +133,9 @@ After writing spec document, fresh-eyes check:
 4. **Ambiguity check:** Requirement interpretable two ways? Pick one, make explicit.
 
 Fix issues inline. No re-review — fix, move on.
+
+**Spec Review (subagent):**
+After self-review, dispatch one fresh reviewer subagent using [spec-document-reviewer-prompt.md](spec-document-reviewer-prompt.md) with the spec path. Fresh eyes catch what the author cannot. Reviewer returns Status + Issues. Issues found: fix them, re-dispatch. Approved: proceed to user review.
 
 **User Review Gate:**
 After spec review loop passes, ask user to review written spec before proceeding:
