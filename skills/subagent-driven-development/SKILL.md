@@ -1,3 +1,10 @@
+---
+name: subagent-driven-development
+description: Use when executing implementation plans with mostly independent tasks in the current session
+user-invocable: true
+disable-model-invocation: true
+---
+
 # Subagent-Driven Development
 
 Execute plan: fresh implementer subagent per task, task review (spec + quality) after each, broad whole-branch review at end.
