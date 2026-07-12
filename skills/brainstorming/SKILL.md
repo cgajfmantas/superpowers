@@ -25,6 +25,8 @@ Every project goes through process. Todo list, single-function utility, config c
 
 `/home/hermes/.superpowers/YYYY/<feature-name>/spec/spec.md`
 
+`YYYY` = current year (e.g. `2026`) — never create a literal `YYYY` directory.
+
 Feature owns one directory — `/home/hermes/.superpowers/YYYY/<feature-name>/` —
 everything in sibling subfolders: `spec/`, `plan/`, `sdd/`. Spec goes in `spec/spec.md`; plan (`plan/plan.md`) and task files (`plan/tasks/task.NN.md`) in `plan/` (see superpowers:writing-plans); SDD execution artifacts in `sdd/`.
 
@@ -35,7 +37,7 @@ MUST create task per item, complete in order:
 1. **Explore project context** — files, docs, recent commits
 2. **Ask clarifying questions** — one at time, understand purpose/constraints/success criteria
 3. **Propose 2-3 approaches** — trade-offs plus recommendation
-4. **Present design** — sections scaled to complexity, get approval after each section
+4. **Present design** — sections scaled to complexity, get approval — batch sections into one message unless design is long
 5. **Write design doc** — save to [SPEC_FILE_PATH], commit
 6. **Spec self-review** — quick inline check: placeholders, contradictions, ambiguity, scope (see below)
 7. **User reviews written spec** — user reviews spec file before proceeding
@@ -48,7 +50,7 @@ digraph brainstorming {
     "Explore project context" [shape=box];
     "Ask clarifying questions" [shape=box];
     "Propose 2-3 approaches" [shape=box];
-    "Present design sections" [shape=box];
+    "Present full design" [shape=box];
     "User approves design?" [shape=diamond];
     "Write design doc" [shape=box];
     "Spec self-review\n(fix inline)" [shape=box];
@@ -57,9 +59,9 @@ digraph brainstorming {
 
     "Explore project context" -> "Ask clarifying questions";
     "Ask clarifying questions" -> "Propose 2-3 approaches";
-    "Propose 2-3 approaches" -> "Present design sections";
-    "Present design sections" -> "User approves design?";
-    "User approves design?" -> "Present design sections" [label="no, revise"];
+    "Propose 2-3 approaches" -> "Present full design";
+    "Present full design" -> "User approves design?";
+    "User approves design?" -> "Present full design" [label="no, revise"];
     "User approves design?" -> "Write design doc" [label="yes"];
     "Write design doc" -> "Spec self-review\n(fix inline)";
     "Spec self-review\n(fix inline)" -> "User reviews spec?";
@@ -90,9 +92,9 @@ digraph brainstorming {
 
 **Presenting the design:**
 
-- Once building clear, present design
-- Scale sections to complexity: few sentences if straightforward, up to 200-300 words if nuanced
-- Ask after each section: looks right so far?
+- Once building clear, present full design in one message, sections scaled to complexity: few sentences if straightforward, up to 200-300 words per section if nuanced
+- Ask for feedback ONCE on the whole design — one approval per artifact, not per section (mirrors batched-question pattern elsewhere in the workflow)
+- Split into per-section approvals only when design is long (over ~300 words) or user already voiced doubts
 - Cover: architecture, components, data flow, error handling, testing
 - Ready to go back and clarify if something unclear
 
@@ -144,5 +146,5 @@ Wait for user response. Changes requested = make them, re-run spec review loop. 
 - **Multiple choice preferred** - Easier than open-ended when possible
 - **YAGNI ruthlessly** - Cut unnecessary features from all designs
 - **Explore alternatives** - Always 2-3 approaches before settling
-- **Incremental validation** - Present design, get approval before moving on
+- **Batched validation** - One approval per artifact (design, spec, plan), not per section
 - **Be flexible** - Go back, clarify when something unclear
