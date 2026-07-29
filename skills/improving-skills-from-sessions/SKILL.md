@@ -29,7 +29,7 @@ The report is a compression boundary. Phase 1 reads hundreds of thousands of tok
 **Report template:** [session-report-template.md](session-report-template.md), filled. Not a paraphrase, not one composed from memory.
 
 1. **Date the session and pin the revisions.** Which skill revisions were in force during the span. Do this first; every later step is read against it.
-2. **Run the sensors** with the scripts below, pasting output verbatim. What each stage of the pipeline leaks into a transcript is catalogued in [reading-transcripts.md](reading-transcripts.md) § Sensors by pipeline stage.
+2. **Run the sensors** with the scripts below, pasting output verbatim. Three checks a competent reader will not make unprompted are listed in [reading-transcripts.md](reading-transcripts.md) § Checks nobody performs spontaneously.
 3. **Write findings** — each with stage, location, evidence, the guidance in force, and a classification.
 4. **Stop.** Do not propose fixes. A report that carries its own conclusions gets rubber-stamped in Phase 2 rather than judged.
 
@@ -43,6 +43,13 @@ git log --until=<that date> -1 --format='%h %ad' -- skills/<skill>/SKILL.md
 ```
 
 Concretely: on the run this skill was built from, 73 of 75 agents never dispatched a subagent — which reads as guidance being ignored until you notice the advice landed three days *after* the run began. Same measurement, opposite conclusion. A long run may span several revisions; treat each stretch separately or the evidence is a blend.
+
+**A revision landing mid-run usually does not reach that run.** Check before treating post-edit behaviour as non-compliance:
+
+- **Run-local frozen copies.** `subagent-driven-development` writes its invariant template once per run to `…/sdd/implementer-common.md` and hands dispatches that path. Verified on this run: that file was written 2026-07-28 15:53 while the guidance landed 2026-07-29 16:21 — so no implementer dispatched afterwards could have read it, and two apparent recurrences "hours after the fix" were baseline, not rationalization. `stat -c '%y %n'` the run's `sdd/*-common.md` and compare against the commit time.
+- **A controller already in flight** is working from what it loaded, not from the file on disk.
+
+Get this backwards and Phase 2 bulletproofs a rule nobody read — the mirror of deleting guidance that was never in force. When in doubt the classification is `baseline-predates-guidance`, and the honest conclusion is that the run cannot evaluate that revision at all.
 
 ### Scripts
 

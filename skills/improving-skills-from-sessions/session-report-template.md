@@ -120,4 +120,8 @@ The five values are not interchangeable and they decide what Phase 2 does:
 - **decoration** — guidance present for the whole span and never exercised. Phase 2 deletes.
 - **baseline-predates-guidance** — the behaviour is real but the guidance did not exist yet. **Not a verdict on the guidance.** It is RED-phase evidence: it says the behaviour is what the guidance must overcome, and how strong it is.
 
-The last one is the easy mistake. Absence of a mandated behaviour in a run that predates the mandate looks identical to the mandate being ignored, and reads as `decoration` unless you checked the dates. If the revision table is missing, every classification here is unsafe.
+The last one is the easy mistake, and it has two halves.
+
+Absence of a mandated behaviour in a run that predates the mandate looks identical to the mandate being ignored, and reads as `decoration` unless you checked the dates. And behaviour occurring *after* an edit landed is not automatically `rationalization`: a run may never see the edit at all, because `subagent-driven-development` freezes its invariant template into `…/sdd/implementer-common.md` once per run and hands dispatches that path. On the run this skill was built from, that file predated the guidance by a day, so every "recurrence hours after the fix" was baseline. Compare `stat -c '%y' <run>/sdd/*-common.md` against the commit time before writing `rationalization`.
+
+If the revision table is missing, every classification here is unsafe.

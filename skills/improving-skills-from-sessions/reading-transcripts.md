@@ -15,21 +15,15 @@ Reference for the measurement half of `improving-skills-from-sessions`. Read it 
 
 Per request, `message.usage` carries `input_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`, `output_tokens`, and `cache_creation.ephemeral_{5m,1h}_input_tokens`.
 
-## Sensors by pipeline stage
+## Checks nobody performs spontaneously
 
-Cost is one sensor and not the interesting one.
+Deliberately short. A control run of this audit with no skill at all organised its findings by pipeline stage unprompted, and found the spec, planner and reviewer problems on its own — so a catalogue of "look at the spec, look at the planner" was decoration and has been cut. These three are what that control did **not** do:
 
-**Spec** — `NEEDS_CONTEXT` returns citing unclear or missing requirements; plan amendments whose root cause is the spec rather than the plan; two tasks implementing contradictory readings of one requirement.
+- **RED before GREEN.** A report claiming TDD is checkable: the RED command must appear in the transcript *before* the implementation edits, not merely be described afterwards. Claimed-not-done is invisible unless you look for the ordering.
+- **Escape rate.** Defects the *final* review caught that per-task reviews missed, plus defects a *later task's* implementer tripped over. This is the only real test of the per-task gate, and no amount of reading individual reviews substitutes for it.
+- **Absence of a mandated call.** See below — cheap, decisive, and nobody looks.
 
-**Planner** — repeated reads of one large file (task too big to hold at once); fix dispatches per task (boundaries drawn wrong); interface mismatches surfacing during implementation; implementers inventing test cases (the brief carried prose where it needed data); a long suite triggered by task number rather than by what it observes.
-
-**Implementer** — GREEN evidence with no preceding RED (TDD claimed, not done); files touched outside the plan's map; commits bundling a fix with a feature; polling instead of handing off; a mandated tool never called.
-
-**Reviewer** — findings per review, and how many were nits; defects the *final* review caught that per-task reviews missed, and defects a *later task's* implementer tripped over — both measure escape rate, the only real test of the per-task gate; re-running suites the template forbids; approving on the implementer's stated rationale.
-
-**Controller** — re-dispatching a task the ledger marks complete; dispatches composed from memory instead of the template; closing a task with a gate unsatisfied.
-
-**Cost** — expensive turns are a cheap *detector* pointing at the stages above, never a finding themselves. A run that wasted money did it by doing something the skills should have prevented; name that instead.
+Everything else a competent reader finds by reading. Cost is a *detector* pointing at those readings, never a finding itself: a run that wasted money did it by doing something the skills should have prevented, so name that instead.
 
 ## Reading the raw blocks
 
