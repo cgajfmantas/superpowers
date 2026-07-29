@@ -11,6 +11,7 @@ Use template when dispatch task reviewer subagent. Reviewer read task diff once,
 - `[BRIEF_FILE]` — REQUIRED: plan task file (`plan/tasks/task.NN.md`) — same self-contained file implementer worked from
 - `[GLOBAL_CONSTRAINTS_FILES]` — REQUIRED: path to `plan/global-constraints.md`, handed whole — plus, in layer-split plan, one path per layer task's `**Layers:**` line names. **Same set implementer got**, no more, no less: hand reviewer extra layer file → reviewer flags implementer for missing rule implementer never saw; hand fewer → constraint goes unreviewed. Never a section reference into a bigger file, never an extraction command (`sed -n`, `head -N`): range extraction truncates silently and reviewer cannot tell. Plan-specific spec constraint not in that file and binding this task → move it into that file (Plan Amendments) rather than pasting it here
 - `[REPORT_FILE]` — REQUIRED: file implementer wrote detailed report
+- `[REVIEW_CHECKLIST_FILE]` — REQUIRED: run's standing review checklist (`sdd/review-checklist.md`), handed whole by path. One line per defect class this project already produced; may be empty early in a run. Never paste its lines into prompt, never hand a subset — see SKILL.md § Standing Review Checklist
 - `[BASE_SHA]` — commit before task
 - `[HEAD_SHA]` — current commit
 - `[DIFF_FILE]` — REQUIRED: path controller wrote review package to (`scripts/review-package PLAN_FILE BASE HEAD` prints unique path it wrote; package never enter controller context)
@@ -54,6 +55,12 @@ Subagent (general-purpose):
     Warnings or noise in implementer's reported test output = findings — test output should be pristine.
 
     Report list suite under **Deferred verification** → controller's batch gate own it, not you. No run it, no flag its absent evidence as finding. Deferred suite the plan never defers, or evidence missing for suite implementer should have run → that IS finding.
+
+    ## Known Defect Classes
+
+    Read standing checklist: [REVIEW_CHECKLIST_FILE]. Each line = defect class this project already produced once, with how to check it. Check diff against every line that could apply to these files; name in report which ones you checked. Empty file = none recorded yet, fine.
+
+    No append to file yourself — controller records classes. Find a defect likely to recur in other tasks → say so in report so it get recorded.
 
     ## Part 1: Spec Compliance
 

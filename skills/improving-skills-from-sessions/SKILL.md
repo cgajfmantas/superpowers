@@ -79,8 +79,10 @@ For each finding, its classification already decided the move:
 | **gap** | Add guidance; match its form to the failure per `writing-skills` |
 | **rationalization** | Bulletproof — rationalization table, red flags, close the loophole |
 | **factual-error** | Correct or delete the claim, and name its source |
-| **decoration** | Delete the guidance |
+| **decoration** | Delete the guidance — but first see the check below |
 | **baseline-predates-guidance** | Nothing to fix. Keep the finding as the RED baseline for the guidance that followed, and check its form is strong enough for a behaviour that universal |
+
+**Before deleting as decoration, check the guidance asked for the missing behaviour.** Absence is only decoration if the skill wanted the thing that is absent. Caught on this skill's own first audit: a finding reported the cheap model tier as unused across 75 dispatches and classified it decoration — but the revision in force said mid-tier is the *floor* for implementers and reviewers and reserves the cheap tier for single-file mechanical fixes. Every dispatch was an implementer, reviewer or fixer, so declining the cheap tier was the prescribed behaviour. The guidance was exercised by being obeyed. Read the surrounding guidance, not just the count.
 
 **Factual errors are invisible to evals.** A verifier grades whether the agent followed the skill, not whether the skill is true, so a skill can be internally coherent, pass every scenario, and still assert a mechanism the tool's own documentation contradicts. For any claim about harness behaviour, tool semantics, or pricing: name the source. Unsourced → delete or soften.
 

@@ -58,7 +58,7 @@ Task = smallest unit with own test cycle, worth fresh reviewer's gate. Drawing b
 
 **Independence is necessary, not sufficient — size the working set too.** Rule above draws boundaries by deliverable and reviewer gate. Task can pass that test and still be too big, because nothing in it counts how much *existing* code the implementer must hold at once. Add up bytes of files the task modifies, plus their tests and any page or fixture it must touch.
 
-Measured, one real task: 4 SFCs totalling **81KB, one of them 61KB alone**. Clean unit by every rule above — one widget subtree, one test cycle, one reviewer gate. Its implementer read the 61KB file **9 times** and its sibling 8 times, because four files that size do not fit a working set at once. That task became its run's most expensive (~$105, about half of it idle re-caching) **and** shipped two evidence defects that needed a follow-up remediation task. Cost and quality failed together, from the one cause.
+Measured, one real task: 4 SFCs totalling **81KB, one of them 61KB alone**. Clean unit by every rule above — one widget subtree, one test cycle, one reviewer gate. Its implementer read the 61KB file **9 times** and its sibling 8 times, because four files that size do not fit a working set at once. That task became the most expensive in its run **and** shipped two evidence defects that needed a follow-up remediation task. Cost and quality failed together, from the one cause.
 
 File Structure above already says prefer smaller focused files — that covers files the plan *creates*. This covers files the plan *touches*. In existing codebase you often cannot shrink them, so split the task instead: one file per task where files are large, even where a reviewer could have approved them together.
 
@@ -84,6 +84,8 @@ File Structure above already says prefer smaller focused files — that covers f
 
 **Tech Stack:** [Key technologies/libraries]
 
+**Base commit:** `[full SHA]` — the tree every transcribed value in this plan was read from
+
 **Global Constraints:** [./global-constraints.md](./global-constraints.md) — binds every task
 
 [If split by layer, list each layer file here too:]
@@ -101,6 +103,10 @@ File Structure above already says prefer smaller focused files — that covers f
 
 ---
 ```
+
+**Base commit is what makes the plan's transcribed values checkable.** Every signature, `emits` list, slot name, selector and measured value in a task file was read from *some* tree — record which one, full SHA. Execution confirms it is still an ancestor of `HEAD` before Task 1 (`superpowers:subagent-driven-development` § Pre-Flight Plan Review). When it is not — rebase, force-push, squash — every transcription in the plan is a claim to re-verify, not a contract to implement against.
+
+Measured: one plan's declared base was no longer an ancestor of the branch tip by the time execution started; the branch had been rebased and 467 files differed. Every task file's transcribed `emits` and slot lists had been verified against the pre-rebase tree. The controller happened to compare the two before dispatching Task 1 — no skill asked it to, and nothing in the plan itself would have revealed it.
 
 ## Global Constraints
 
@@ -171,6 +177,10 @@ That line is what the controller routes on. A task with no layer line in a split
 
 **Duplication across task files is deliberate; its cost is drift.** When a signature or constraint changes — during plan writing OR execution — grep the old symbol across the whole `plan/` directory, update every occurrence, verify zero leftovers. Values shared by many tasks belong in `global-constraints.md` (one copy); restate only what is task-specific.
 
+**The Files list and the test cases must agree.** Each declared test case names a behavior; trace it to the file whose change makes it pass, and check that file is in the task's Files list. A test case that cannot pass by editing only the listed files is a plan bug — the implementer meets a contradiction inside its own brief, and resolves it either by stopping or by delivering the listed files with the declared test still failing.
+
+Measured: a task titled for three components listed only two of them under Files. Its implementer reproduced, in two environments, that the *unlisted* component was why the task's declared acceptance test could not pass — and left it untouched, citing the Files-list boundary. A second pass fixed that component but not the listed one that had to forward its event, so the task's stated contract was still undelivered after two passes; it took three.
+
 **The plan specifies behavior and contracts, not implementation code.** Interfaces block carries exact signatures — that is what connects tasks. Behavior and Test Cases carry what the code must do, with test cases as data (input → expected output). The implementer writes the actual test and implementation code via real TDD: the failing test fails for a real reason, not one the planner guessed.
 
 ````markdown
@@ -182,6 +192,7 @@ That line is what the controller routes on. A task with no layer line in a split
 - Create: `exact/path/to/file.py`
 - Modify: `exact/path/to/existing.py:123-145`
 - Test: `tests/exact/path/to/test.py`
+[Every file a declared test case below needs changed appears in this list]
 
 **Interfaces:**
 - Consumes: [what this task uses from earlier tasks — exact signatures]
@@ -230,6 +241,28 @@ git commit -m "feat: add specific feature"
 ```
 ````
 
+## Exact Values Carry Their Source
+
+The sections above demand exact values everywhere. Each one comes from exactly one of two places:
+
+- **Copied from an authoritative source** — the spec, the tool's own documentation, or the code as it stands at the plan's Base commit. Name the source.
+- **Measured while writing the plan** — record the command beside the value.
+
+A value you *derived by reasoning* about a framework's defaults is neither. Measure it before writing it down, or write the measurement command in place of the number and let the implementer produce it.
+
+**Never print an unverified number next to an instruction to measure that same thing.** Prose saying "do not assume the upstream default, measure the computed value" loses to a table of concrete numbers on the same page — the table is what gets used. Where a constraint tells the implementer to measure something, the plan supplies no figure for it.
+
+Measured: one plan's translation table carried nine wrong literals beside exactly that instruction — a root font-size of 16px where the project set 14px, invalidating every rem-derived figure in the table; a 15px gutter an override had made 14px; a 16px spacing that was 7px. Each was an upstream framework default rather than a value measured in the project. Each was discovered by a task colliding with it, and each cost that task a cycle.
+
+## Verification Commands Pin What They Read
+
+Every command the plan tells someone to run reads some state. Name that state, and pin when the command runs relative to it: the staged index, the working tree, a commit range, a built artifact, a running service.
+
+- A gate over *staged* files runs before `git commit`, and the plan says so where it declares the command — not in prose elsewhere.
+- Expected output must distinguish *inspected the change and found nothing* from *inspected nothing*. A command that prints a pass on empty input needs an expected line showing what it covered ("audited N files"), and that line is part of the pass condition.
+
+Measured: one plan declared a migration gate that audits staged files without saying so. Tasks ran it after committing, so it inspected an empty set and printed a pass — every such pass was vacuous. The task that reported the gate green shipped a live instance of the exact class the gate exists to catch, found only when a reviewer re-ran the gate against the right state.
+
 ## No Placeholders
 
 Every task must contain the actual contract an engineer needs. These are **plan failures** — never write them:
@@ -257,6 +290,10 @@ After writing the complete plan, look at the spec with fresh eyes and check the 
 **2. Placeholder scan:** Search your plan for red flags — any of the patterns from the "No Placeholders" section above. Fix them.
 
 **3. Type consistency:** Do the signatures in each task's Interfaces block match across tasks? A function called `clearLayers()` in Task 3's Produces but `clearFullLayers()` in Task 7's Consumes is a bug.
+
+**4. Value provenance:** Does every exact value trace to a named source or to a command you ran (see Exact Values Carry Their Source)? Is any number printed beside an instruction to measure that same thing? Is the Base commit recorded, and is it the tree you actually read those values from?
+
+**5. Verification can fire:** Per task, can every declared test case pass by changing only the files its Files list names? Per prescribed command, is the state it reads pinned, and can its expected output be produced by inspecting nothing?
 
 Issues found: fix inline. No re-review — fix, move on. Spec requirement with no task: add task.
 

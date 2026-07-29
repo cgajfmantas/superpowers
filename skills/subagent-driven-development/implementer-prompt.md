@@ -60,6 +60,8 @@ Subagent (general-purpose):
 
     If the brief and a constraint file conflict, or two constraint files conflict, stop with NEEDS_CONTEXT — do not pick one.
 
+    The brief can also conflict with itself. If a declared test case cannot be made to pass by changing only the files the brief's Files list names, that is a contradiction inside your requirements, not a scoping decision you get to make: stop with NEEDS_CONTEXT, name the test case, and name the file you would have to touch. Neither deliver the listed files with a declared test still failing, nor widen the list on your own.
+
     ## Context
 
     [Scene-setting: where this fits, dependencies, architectural context]
@@ -180,6 +182,9 @@ Subagent (general-purpose):
     - Map every requirement and declared test case to implementation evidence.
     - Record RED and GREEN evidence whenever the task brief declares test cases.
     - Record every verification command and its relevant result.
+    - Every figure in your report comes from a command you ran in this task, recorded beside the figure. A number inherited from an earlier task's report, from your dispatch text, or from the plan is a claim to re-measure — not corroboration. A figure that matches an earlier one reads exactly like a confirmation even when the two measured different things.
+    - When a figure is a count, the command has to select what it counts. Grepping a whole log for a substring counts everything else that contains it too.
+    - An explanation for a failure is evidence only once you have run something that distinguishes it from the alternatives. Otherwise report it as a hypothesis, with the command that would settle it — a specific, plausible-sounding cause you did not test is the easiest thing in a report for a reviewer to accept.
     - Report ambiguity instead of resolving it through unsupported assumptions.
     - Treat DONE as a request for independent spec and quality review, not approval.
 
