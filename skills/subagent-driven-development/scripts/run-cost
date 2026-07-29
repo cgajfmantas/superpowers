@@ -1,0 +1,294 @@
+#!/usr/bin/env bash
+# Report what a subagent-driven-development run actually cost, per agent, from
+# the harness's own transcripts. Prints a table plus a total.
+#
+# Why this exists: a ledger records commits and verdicts and says nothing about
+# cost, so a $105 task and an $8 task look identical in it. Every figure in the
+# sdd-cost-controls analysis came from hand-written throwaway scripts; this is
+# that analysis made repeatable, so a regression is noticed without one.
+#
+# The actionable column is EXPIRY: tokens re-cached in a single turn because a
+# gap exceeded the prompt-cache TTL. That is spend for content that did not
+# change — the signature of an agent that waited badly.
+#
+# Two counting rules that are easy to get wrong:
+#   * The raw JSONL logs each request more than once. Dedup by requestId or
+#     naive summing roughly doubles every figure.
+#   * Cache prices are multiples of a model's base input price: write is 1.25x
+#     at the 5-minute TTL and 2x at 1 hour; read is 0.1x. Quoting a recalled
+#     per-model write price is how the first draft of that analysis overstated
+#     an Opus controller by 3x.
+#
+# Usage:
+#   run-cost RUN [--json]           one run: a controller session + its subagents
+#   run-cost --project DIR [--json] every run in a Claude Code project directory
+#
+# RUN is either the session transcript (<session-id>.jsonl) or the session
+# directory (<session-id>/) — both resolve to the same run. Claude Code stores
+# the two halves as siblings:
+#
+#   ~/.claude/projects/<project-slug>/
+#     <session-id>.jsonl              <- the controller's own transcript
+#     <session-id>/subagents/*.jsonl  <- one per dispatched subagent
+#
+# so a run is only fully costed when both halves are read. Pointing at just the
+# directory silently omits the controller, which is exactly the agent whose
+# spend is least visible.
+set -euo pipefail
+
+die() {
+  echo "error: $*" >&2
+  exit 2
+}
+
+usage() {
+  sed -n '/^# Usage:/,/^# PROJECT_DIR/p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+target=""
+mode="run"
+as_json=false
+
+while [ $# -gt 0 ]; do
+  case $1 in
+    --json) as_json=true ;;
+    --project)
+      mode="project"
+      shift
+      [ $# -gt 0 ] || die "--project needs a path"
+      target=$1
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -*) die "unknown option: $1" ;;
+    *) target=$1 ;;
+  esac
+  shift
+done
+
+[ -n "$target" ] || {
+  usage >&2
+  exit 2
+}
+command -v python3 >/dev/null 2>&1 || die "python3 is required"
+
+if [ "$mode" = "project" ]; then
+  [ -d "$target" ] || die "no such project directory: $target"
+else
+  # Accept either half of a run and normalise to the session stem.
+  target=${target%/}
+  target=${target%.jsonl}
+  [ -f "$target.jsonl" ] || [ -d "$target" ] \
+    || die "no run at $target — expected $target.jsonl or $target/"
+fi
+
+MODE=$mode TARGET=$target AS_JSON=$as_json python3 - <<'PY'
+import json
+import os
+import sys
+import datetime as dt
+from glob import glob
+
+MODE = os.environ["MODE"]
+TARGET = os.environ["TARGET"]
+AS_JSON = os.environ["AS_JSON"] == "true"
+
+# Base input price per million tokens. Cache write = 1.25x (5m TTL) or 2x (1h);
+# cache read = 0.1x; output priced separately. Long-context tiers are NOT
+# applied — these models bill their 1M window at standard rates.
+RATES = {
+    "opus":   (5.00, 25.00),
+    "sonnet": (3.00, 15.00),
+    "haiku":  (1.00,  5.00),
+    "fable":  (10.00, 50.00),
+}
+WRITE_5M, WRITE_1H, READ = 1.25, 2.00, 0.10
+EXPIRY_THRESHOLD = 100_000   # a single turn writing more than this re-cached a prefix
+
+
+def rate_for(model):
+    """Map a model id or shorthand onto a base rate. None if unrecognised."""
+    if not model:
+        return None
+    m = model.lower()
+    for key, rates in RATES.items():
+        if key in m:
+            return rates
+    return None
+
+
+def ts(value):
+    return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def read_transcript(path):
+    """Return (requests, model). Dedup by requestId — the raw log repeats each."""
+    seen, order, model = {}, [], None
+    with open(path, errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            msg = row.get("message") or {}
+            if msg.get("model"):
+                model = msg["model"]
+            usage = msg.get("usage")
+            if not usage or not row.get("timestamp"):
+                continue
+            key = row.get("requestId") or msg.get("id")
+            if key not in seen:
+                order.append(key)
+            # Last write wins: the repeated entries carry the same usage, and
+            # the final one is the most complete.
+            seen[key] = {
+                "at": ts(row["timestamp"]),
+                "write": usage.get("cache_creation_input_tokens", 0),
+                "read": usage.get("cache_read_input_tokens", 0),
+                "plain": usage.get("input_tokens", 0),
+                "out": usage.get("output_tokens", 0),
+                "ttl_1h": (usage.get("cache_creation") or {}).get(
+                    "ephemeral_1h_input_tokens", 0
+                ),
+            }
+    return [seen[k] for k in order], model
+
+
+def summarise(path, model_hint=None):
+    reqs, model = read_transcript(path)
+    if not reqs:
+        return None
+    model = model_hint or model
+    expiry_tokens = expiry_turns = 0
+    for i, req in enumerate(reqs):
+        # A cold start (first request) is unavoidable, not waste.
+        if req["write"] > EXPIRY_THRESHOLD and i > 0:
+            expiry_tokens += req["write"]
+            expiry_turns += 1
+    write = sum(r["write"] for r in reqs)
+    read = sum(r["read"] for r in reqs)
+    plain = sum(r["plain"] for r in reqs)
+    out = sum(r["out"] for r in reqs)
+    ttl_1h = sum(r["ttl_1h"] for r in reqs)
+
+    rates = rate_for(model)
+    if rates:
+        base, out_rate = rates
+        # Attribute writes to the TTL they were actually made at.
+        write_1h = min(ttl_1h, write)
+        write_5m = write - write_1h
+        cost = (
+            write_5m * base * WRITE_5M
+            + write_1h * base * WRITE_1H
+            + read * base * READ
+            + plain * base
+            + out * out_rate
+        ) / 1e6
+        expiry_cost = expiry_tokens * base * WRITE_5M / 1e6
+    else:
+        cost = expiry_cost = None
+
+    return {
+        "name": os.path.basename(path).replace(".jsonl", ""),
+        "model": model or "unknown",
+        "requests": len(reqs),
+        "write": write,
+        "read": read,
+        "output": out,
+        "expiry_tokens": expiry_tokens,
+        "expiry_turns": expiry_turns,
+        "cost": cost,
+        "expiry_cost": expiry_cost,
+        "minutes": (reqs[-1]["at"] - reqs[0]["at"]).total_seconds() / 60,
+    }
+
+
+def describe(path):
+    """Read a subagent's sidecar meta for its description and dispatched model."""
+    meta_path = path.replace(".jsonl", ".meta.json")
+    if not os.path.exists(meta_path):
+        return None, None
+    try:
+        meta = json.load(open(meta_path))
+    except (json.JSONDecodeError, OSError):
+        return None, None
+    return meta.get("description"), meta.get("model")
+
+
+def collect_run(stem):
+    """One run = the controller transcript <stem>.jsonl plus <stem>/subagents/."""
+    out = []
+    session_file = stem + ".jsonl"
+    if os.path.exists(session_file):
+        row = summarise(session_file)
+        if row:
+            row["role"] = "controller"
+            row["name"] = "CONTROLLER " + row["name"][:8]
+            out.append(row)
+    for sub in sorted(glob(os.path.join(stem, "subagents", "*.jsonl"))):
+        desc, model_hint = describe(sub)
+        row = summarise(sub, model_hint)
+        if row:
+            row["role"] = "subagent"
+            if desc:
+                row["name"] = desc
+            out.append(row)
+    return out
+
+
+rows = []
+if MODE == "run":
+    rows = collect_run(TARGET)
+else:
+    for session in sorted(glob(os.path.join(TARGET, "*.jsonl"))):
+        rows.extend(collect_run(session[: -len(".jsonl")]))
+
+if not rows:
+    print("no transcripts with usage data found", file=sys.stderr)
+    sys.exit(1)
+
+if AS_JSON:
+    print(json.dumps(rows, indent=2, default=str))
+    sys.exit(0)
+
+rows.sort(key=lambda r: r["cost"] if r["cost"] is not None else -1, reverse=True)
+
+print(f"{'AGENT':<44} {'MODEL':<8} {'REQS':>5} {'MINS':>6} "
+      f"{'COST':>9} {'EXPIRY':>9} {'%':>4}")
+print("-" * 92)
+total = expiry_total = 0.0
+unpriced = 0
+for r in rows:
+    if r["cost"] is None:
+        unpriced += 1
+        cost_s, exp_s, pct_s = "unknown", "unknown", "-"
+    else:
+        total += r["cost"]
+        expiry_total += r["expiry_cost"]
+        pct = 100 * r["expiry_cost"] / r["cost"] if r["cost"] else 0
+        cost_s = f"${r['cost']:.2f}"
+        exp_s = f"${r['expiry_cost']:.2f}"
+        pct_s = f"{pct:.0f}%"
+    name = r["name"][:43]
+    print(f"{name:<44} {r['model'][:8]:<8} {r['requests']:>5} "
+          f"{r['minutes']:>6.0f} {cost_s:>9} {exp_s:>9} {pct_s:>4}")
+
+print("-" * 92)
+print(f"{'TOTAL':<44} {'':<8} {sum(r['requests'] for r in rows):>5} "
+      f"{'':>6} {'$' + format(total, '.2f'):>9} "
+      f"{'$' + format(expiry_total, '.2f'):>9} "
+      f"{format(100 * expiry_total / total if total else 0, '.0f') + '%':>4}")
+print()
+print(f"EXPIRY = tokens re-cached in one turn above {EXPIRY_THRESHOLD:,}, "
+      "excluding each agent's cold start.")
+print("It is spend on content that did not change — the signature of an agent "
+      "that waited past the cache TTL.")
+if unpriced:
+    print(f"note: {unpriced} agent(s) had an unrecognised model and are "
+          "reported without a cost.", file=sys.stderr)
+PY
