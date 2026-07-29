@@ -172,7 +172,7 @@ Two patterns, in order of preference:
 `scripts/await-job` implements the launch and the capped poll — use it rather than re-deriving the cadence arithmetic per dispatch:
 
 - `await-job start LOGFILE CMD…` — detach via `setsid`, print log and sentinel paths. Refuses to relaunch over a log that is still growing without a sentinel, so a second multi-hour run cannot start by accident.
-- `await-job wait LOGFILE [SECONDS]` — poll for at most 240s (higher values capped, with a note), then print `PENDING` and return. Collector calls it again. On completion prints `DONE <exit status>` plus the log tail, and exits nonzero if the job failed.
+- `await-job wait LOGFILE [SECONDS]` — poll for at most 110s by default, then print `PENDING` and return. Collector calls it again. On completion prints `DONE <exit status>` plus the log tail, and exits nonzero if the job failed. The default is deliberately well under the cadence ceiling: a harness that caps shell calls at 120s kills a longer sleep with no output at all — verified, `wait LOG 130` returned nothing and exited 143. Raising SECONDS (max 240) means raising the caller's tool timeout to match, and buys nothing, since every value under the TTL costs the same read-priced poll.
 - `await-job status LOGFILE` — one-shot check, no sleep.
 
 **Collector dispatch.** Small enough to live here rather than in its own file, but still a template — fill and dispatch it, do not compose one from memory. It must carry no task context: context is the entire cost being avoided.
@@ -186,7 +186,7 @@ Subagent (general-purpose):
 
     Poll with: [AWAIT_JOB_PATH] wait [LOGFILE]
 
-    Each call returns either PENDING — then call it again, unchanged — or DONE with an exit status and the log's tail. Nothing else you can do makes it finish sooner; do not add your own sleep, and do not raise the interval.
+    Each call returns either PENDING — then call it again, unchanged — or DONE with an exit status and the log's tail. Nothing else you can do makes it finish sooner; do not add your own sleep, and do not pass a longer interval — a longer one gets your call killed with no output, which tells you nothing about the job.
 
     When it reports DONE, return exactly:
     - **Result:** PASSED | FAILED (exit status)

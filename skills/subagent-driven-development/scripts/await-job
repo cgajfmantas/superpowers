@@ -17,14 +17,23 @@
 #
 # Usage:
 #   await-job start LOGFILE CMD...   launch detached; print log + sentinel paths
-#   await-job wait LOGFILE [SECONDS] poll up to SECONDS (default/max 240)
+#   await-job wait LOGFILE [SECONDS] poll up to SECONDS (default 110, max 240)
 #   await-job status LOGFILE         check once, do not sleep
 #
 # The sentinel is LOGFILE.exit and holds the job's exit status. `wait` and
 # `status` print `PENDING` (exit 0, poll again) or `DONE <status>` plus the
 # log's tail (exit 0 if the job succeeded, 1 if it failed).
+#
+# The default is 110s, not the 240s ceiling, because a harness that caps shell
+# calls at 120s kills a longer sleep outright — SIGTERM, no output at all, not
+# even the PENDING line. Verified against Claude Code, whose Bash tool defaults
+# to a 120s timeout: `wait LOG 130` returned nothing and exited 143. Raising
+# SECONDS above ~110 therefore requires raising the caller's own tool timeout to
+# match, and buys nothing: every value under the 300s cache TTL costs the same
+# read-priced poll.
 set -euo pipefail
 
+DEFAULT_INTERVAL=110
 MAX_INTERVAL=240
 TAIL_LINES=15
 
@@ -89,7 +98,7 @@ cmd_wait() {
   [ $# -ge 1 ] || die "usage: await-job wait LOGFILE [SECONDS]"
 
   local log=$1
-  local budget=${2:-$MAX_INTERVAL}
+  local budget=${2:-$DEFAULT_INTERVAL}
   local sentinel="$log.exit"
 
   case $budget in
@@ -100,6 +109,9 @@ cmd_wait() {
     # turn re-charges the agent's whole context at write price.
     echo "note: capping wait at ${MAX_INTERVAL}s to keep the prompt cache warm" >&2
     budget=$MAX_INTERVAL
+  fi
+  if [ "$budget" -gt "$DEFAULT_INTERVAL" ]; then
+    echo "note: ${budget}s exceeds the default ${DEFAULT_INTERVAL}s — raise your own tool timeout to match, or this call is killed with no output" >&2
   fi
 
   local waited=0
