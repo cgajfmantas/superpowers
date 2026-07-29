@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# Launch a long-running verification job so it survives the session, and wait
+# for it in bounded polls that keep the prompt cache warm.
+#
+# Two costs make a naive wait expensive. A subagent's context is re-sent whole
+# on every turn, and a pause longer than the 5-minute prompt-cache TTL makes
+# the next turn re-cache all of it at write price instead of read price. One
+# real task polled a 2h11m suite with `sleep 570` and paid ~$2.36 per idle
+# poll — $57 to wait. The same session's `sleep 300` polls cost $0.18 each.
+# So: each `wait` invocation sleeps at most MAX_INTERVAL and returns, and the
+# caller polls again. Never sleep out a whole wait in one call.
+#
+# The harness's own background-execution flag is not enough either: it can be
+# reaped when the turn or session moves on. Two runs of that same suite died
+# at ~45 and ~60 minutes that way. `start` uses setsid so the job outlives
+# the shell, the turn, and the agent.
+#
+# Usage:
+#   await-job start LOGFILE CMD...   launch detached; print log + sentinel paths
+#   await-job wait LOGFILE [SECONDS] poll up to SECONDS (default/max 240)
+#   await-job status LOGFILE         check once, do not sleep
+#
+# The sentinel is LOGFILE.exit and holds the job's exit status. `wait` and
+# `status` print `PENDING` (exit 0, poll again) or `DONE <status>` plus the
+# log's tail (exit 0 if the job succeeded, 1 if it failed).
+set -euo pipefail
+
+MAX_INTERVAL=240
+TAIL_LINES=15
+
+usage() {
+  sed -n '/^# Usage:/,/^#   await-job status/p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+die() {
+  echo "error: $*" >&2
+  exit 2
+}
+
+report() {
+  local log=$1 sentinel=$2 status
+
+  status=$(tr -d '[:space:]' <"$sentinel")
+  echo "DONE $status"
+  echo "--- last $TAIL_LINES lines of $log ---"
+  tail -n "$TAIL_LINES" "$log" 2>/dev/null || true
+  [ "$status" = "0" ]
+}
+
+cmd_start() {
+  [ $# -ge 2 ] || die "usage: await-job start LOGFILE CMD..."
+
+  local log=$1
+  shift
+
+  local dir
+  dir=$(dirname "$log")
+  mkdir -p "$dir"
+  [ -d "$dir" ] || die "cannot create log directory: $dir"
+
+  # A live job has a log that keeps growing and no sentinel yet. Refuse to
+  # overwrite that: a second launch of a multi-hour suite is the expensive
+  # mistake, and the log is the only evidence the first one is still going.
+  local sentinel="$log.exit"
+  if [ -f "$log" ] && [ ! -s "$sentinel" ]; then
+    local age
+    age=$(($(date +%s) - $(stat -c %Y "$log")))
+    if [ "$age" -lt 300 ]; then
+      die "$log was written ${age}s ago with no sentinel — a job is probably still running. Poll it with: await-job wait $log"
+    fi
+  fi
+  rm -f "$sentinel"
+  : >"$log"
+
+  # setsid detaches from this shell's session, so the job is not reaped when
+  # the turn ends. The sentinel is written after the command exits, whatever
+  # its status, so a crashed job is still observable.
+  setsid nohup bash -c '"$@"; printf "%s\n" "$?" > "$0"' \
+    "$sentinel" "$@" >>"$log" 2>&1 &
+  disown || true
+
+  echo "started: $*"
+  echo "log: $log"
+  echo "sentinel: $sentinel"
+  echo "poll with: await-job wait $log"
+}
+
+cmd_wait() {
+  [ $# -ge 1 ] || die "usage: await-job wait LOGFILE [SECONDS]"
+
+  local log=$1
+  local budget=${2:-$MAX_INTERVAL}
+  local sentinel="$log.exit"
+
+  case $budget in
+    '' | *[!0-9]*) die "SECONDS must be a whole number: $budget" ;;
+  esac
+  if [ "$budget" -gt "$MAX_INTERVAL" ]; then
+    # Not a tuning knob: a longer pause expires the prompt cache and the next
+    # turn re-charges the agent's whole context at write price.
+    echo "note: capping wait at ${MAX_INTERVAL}s to keep the prompt cache warm" >&2
+    budget=$MAX_INTERVAL
+  fi
+
+  local waited=0
+  while [ ! -s "$sentinel" ]; do
+    if [ "$waited" -ge "$budget" ]; then
+      echo "PENDING after ${waited}s ($(wc -l <"$log" 2>/dev/null || echo 0) log lines)"
+      echo "poll again: await-job wait $log"
+      return 0
+    fi
+    sleep 5
+    waited=$((waited + 5))
+  done
+
+  report "$log" "$sentinel"
+}
+
+cmd_status() {
+  [ $# -eq 1 ] || die "usage: await-job status LOGFILE"
+
+  local log=$1
+  local sentinel="$log.exit"
+
+  if [ -s "$sentinel" ]; then
+    report "$log" "$sentinel"
+  else
+    echo "PENDING ($(wc -l <"$log" 2>/dev/null || echo 0) log lines)"
+  fi
+}
+
+[ $# -ge 1 ] || {
+  usage >&2
+  exit 2
+}
+
+action=$1
+shift
+
+case $action in
+  start) cmd_start "$@" ;;
+  wait) cmd_wait "$@" ;;
+  status) cmd_status "$@" ;;
+  -h | --help) usage ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
