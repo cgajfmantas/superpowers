@@ -1,6 +1,8 @@
 ---
 name: improving-skills-from-sessions
 description: Use when deciding whether this project's skills actually work in practice, when a plan or spec produced rework, when a run behaved worse than its skills prescribe, or when you need a real baseline of an agent failing before writing or editing a skill
+user-invocable: true
+disable-model-invocation: true
 ---
 
 # Improving Skills From Sessions
