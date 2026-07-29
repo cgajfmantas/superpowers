@@ -62,6 +62,8 @@ digraph process {
     "Implementer subagent asks questions?" [shape=diamond];
     "Use ask tool if human decision needed; answer and provide context" [shape=box];
     "Implementer subagent implements, tests, commits, self-reviews" [shape=box];
+    "Long suite still running (AWAITING_VERIFICATION)?" [shape=diamond];
+    "Dispatch cheap collector (scripts/await-job wait)" [shape=box];
     "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" [shape=box];
     "Task reviewer reports spec ✅ and quality approved?" [shape=diamond];
     "Dispatch fix subagent for Critical/Important findings" [shape=box];
@@ -78,7 +80,11 @@ digraph process {
   "Implementer subagent asks questions?" -> "Use ask tool if human decision needed; answer and provide context" [label="yes"];
   "Use ask tool if human decision needed; answer and provide context" -> "Dispatch implementer subagent (./implementer-prompt.md)";
   "Implementer subagent asks questions?" -> "Implementer subagent implements, tests, commits, self-reviews" [label="no"];
-  "Implementer subagent implements, tests, commits, self-reviews" -> "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)";
+  "Implementer subagent implements, tests, commits, self-reviews" -> "Long suite still running (AWAITING_VERIFICATION)?";
+  "Long suite still running (AWAITING_VERIFICATION)?" -> "Dispatch cheap collector (scripts/await-job wait)" [label="yes"];
+  "Dispatch cheap collector (scripts/await-job wait)" -> "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" [label="passed"];
+  "Dispatch cheap collector (scripts/await-job wait)" -> "Dispatch fix subagent for Critical/Important findings" [label="failed"];
+  "Long suite still running (AWAITING_VERIFICATION)?" -> "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" [label="no"];
   "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" -> "Task reviewer reports spec ✅ and quality approved?";
   "Task reviewer reports spec ✅ and quality approved?" -> "Dispatch fix subagent for Critical/Important findings" [label="no"];
   "Dispatch fix subagent for Critical/Important findings" -> "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" [label="re-review"];
@@ -147,13 +153,58 @@ Use least powerful model that handles each role. Cheaper, faster.
 
 **Task complexity signals (implementation tasks):** - 1-2 files, fully specified behavior + test cases → mid-tier model - Multi-file, integration concerns → standard model - Design judgment or broad codebase understanding → most capable model
 
+## Long-Running Verification
+
+Verification taking more than ~4 minutes does not run inside implementer. Controller owns it.
+
+**Why:** subagent context grows monotonically — nothing compacts it, and every turn re-sends it whole. Pause longer than the prompt-cache TTL (5 min) and that whole context re-caches at write price instead of read price. Measured on one real task: 22 polls of `sleep 570` against a 2h11m e2e battery, at 630k tokens of context, cost ~$2.36 per idle poll — $57 for zero work, more than the 349 requests that did the actual implementation. Same session's earlier `sleep 300` polls cost $0.18 each.
+
+Two patterns, in order of preference:
+
+**Hoist long suites to batch gates.** Plan names its long suites in `plan/global-constraints.md`. Implementer runs focused tests plus the fast suite, and reports `Deferred verification: <suite>`. Controller runs the long suite once per batch, not once per task — a 2-hour battery per task across a 34-task plan is 68 hours of compute for a signal that rarely changes. Batch boundary = wherever the plan sets one, else after each task the plan marks as affecting that suite, and always before final whole-branch review.
+
+**Per-task long job that genuinely cannot be deferred:** implementer launches it detached, returns AWAITING\_VERIFICATION with log and sentinel paths, and exits. Controller dispatches a **fresh cheapest-tier collector** whose only job is waiting — sentinel path in, one-line result out. Its context is a few thousand tokens, so the poll costing $2.36 from inside the implementer costs a fraction of a cent. Never resume the implementer to wait: resuming restores its full context, which is the cost this pattern exists to avoid.
+
+**Polling cadence: `sleep` 240s per turn, never over 300.** Any agent, any job. Above the TTL each poll re-charges the whole context at write rate; below it, read rate. This is not a tuning knob — raising it to "check less often" multiplies cost roughly 13×. One Bash call may not sleep out the whole wait either: a single 570s call is itself a 570s gap. Each poll turn returns, then the agent polls again.
+
+**Detached, not backgrounded.** Harness background execution can be reaped when the turn or session moves on; a multi-hour job outlives it. Two observed runs of the same 2h11m suite were killed at ~45 and ~60 minutes that way, and the third only survived under `setsid nohup`. Launch detached, redirect to a log, write a sentinel on exit.
+
+`scripts/await-job` implements the launch and the capped poll — use it rather than re-deriving the cadence arithmetic per dispatch:
+
+- `await-job start LOGFILE CMD…` — detach via `setsid`, print log and sentinel paths. Refuses to relaunch over a log that is still growing without a sentinel, so a second multi-hour run cannot start by accident.
+- `await-job wait LOGFILE [SECONDS]` — poll for at most 240s (higher values capped, with a note), then print `PENDING` and return. Collector calls it again. On completion prints `DONE <exit status>` plus the log tail, and exits nonzero if the job failed.
+- `await-job status LOGFILE` — one-shot check, no sleep.
+
+**Collector dispatch.** Small enough to live here rather than in its own file, but still a template — fill and dispatch it, do not compose one from memory. It must carry no task context: context is the entire cost being avoided.
+
+```
+Subagent (general-purpose):
+  description: "Collect Task N verification result"
+  model: [cheapest tier]
+  prompt: |
+    A long-running verification job is already running. Your only job is to wait for it and report the result. Do not read the repository, the plan, or any report file. Do not diagnose failures, and do not start, restart, or fix anything.
+
+    Poll with: [AWAIT_JOB_PATH] wait [LOGFILE]
+
+    Each call returns either PENDING — then call it again, unchanged — or DONE with an exit status and the log's tail. Nothing else you can do makes it finish sooner; do not add your own sleep, and do not raise the interval.
+
+    When it reports DONE, return exactly:
+    - **Result:** PASSED | FAILED (exit status)
+    - The suite's own summary line(s) from the tail, verbatim
+    - Log path: [LOGFILE]
+
+    If it is still PENDING after 40 calls, stop and return: **Result:** STILL RUNNING, with the log line count.
+```
+
 ## Handling Implementer Status
 
-Implementer reports one of four statuses:
+Implementer reports one of five statuses:
 
 **DONE:** Treat status as a report, not proof of completion. First perform the post-task scope check from Per-Task Entry Gate. Then generate review package (`scripts/review-package PLAN_FILE BASE HEAD`, from this skill's directory — PLAN\_FILE = plan index path, locates feature's `sdd/` workspace; prints unique file path it wrote; BASE = commit recorded before dispatching implementer — never `HEAD~1`, which silently drops all but last commit of multi-commit task), and dispatch task reviewer with printed path.
 
 **DONE\_WITH\_CONCERNS:** Work complete, doubts flagged. Read concerns before proceeding. Correctness or scope concerns → address before review. Observations (e.g., "this file is getting large") → note, proceed to review.
+
+**AWAITING\_VERIFICATION:** Implementation complete and committed; a long suite the task requires is launched and unfinished. Neither a blocker nor a context problem — do not re-dispatch the implementer, and do not resume it to wait (that restores its whole context, the cost this status avoids). Dispatch a fresh cheapest-tier collector holding only the sentinel and log paths (`scripts/await-job wait`). Clean result → proceed to review as for DONE. Failures → dispatch fresh fix subagent (implementer template, scoped to the failures, appending to same report file). Task stays open until the suite's result is recorded in the report file — see Formal Task Completion Contract.
 
 **NEEDS\_CONTEXT:** Missing info. Provide context, re-dispatch.
 
@@ -175,7 +226,7 @@ Why: later task files and the final whole-branch reviewer read the plan. Stale p
 
 Per-task reviews = task-scoped gates. Broad review happens once, at final whole-branch review.
 
-**Every dispatch in this skill is a template, filled — never a prompt you write from memory.** Implementer → [implementer-prompt.md](implementer-prompt.md). Task reviewer and re-review → [task-reviewer-prompt.md](task-reviewer-prompt.md). Final whole-branch review → [code-reviewer.md](../requesting-code-review/code-reviewer.md). Fix dispatch → implementer template, scoped to the findings. Read the file at dispatch time; substitute placeholders; keep every section, including the ones that read like boilerplate.
+**Every dispatch in this skill is a template, filled — never a prompt you write from memory.** Implementer → [implementer-prompt.md](implementer-prompt.md). Task reviewer and re-review → [task-reviewer-prompt.md](task-reviewer-prompt.md). Final whole-branch review → [code-reviewer.md](../requesting-code-review/code-reviewer.md). Fix dispatch → implementer template, scoped to the findings. Verification collector → inline template in Long-Running Verification. Read the file at dispatch time; substitute placeholders; keep every section, including the ones that read like boilerplate.
 
 Why it matters more here than it looks: these templates are the *only* thing making a fresh subagent's output comparable across tasks. Drop the reviewer's Calibration section and severities stop meaning the same thing between Task 3 and Task 11. Drop "Do Not Trust the Report" and the reviewer grades the implementer's own rationale. Drop the implementer's Evidence Contract and you get DONE with no RED/GREEN to check. The loss is silent — the dispatch still returns something that reads like a report.
 
@@ -247,6 +298,7 @@ Subagent status is a report, not evidence of completion. Mark a task complete on
 - No Critical or Important finding remains open; required fixes have covering test evidence and clean re-review.
 - The ledger records the verified commit range, clean review, and any actionable lessons.
 - The post-task scope check confirms unrelated and pre-existing working-tree changes were not absorbed or modified.
+- Every verification this task defers — an AWAITING\_VERIFICATION handoff, or a suite the plan routes to a batch gate — has completed, and its result is recorded in the report file. A collector that was never dispatched leaves the task open.
 
 Missing evidence means the task remains open even when the implementation appears correct.
 
@@ -254,6 +306,7 @@ Missing evidence means the task remains open even when the implementation appear
 
 - [implementer-prompt.md](implementer-prompt.md) - Dispatch implementer subagent
 - [task-reviewer-prompt.md](task-reviewer-prompt.md) - Dispatch task reviewer subagent (spec compliance + code quality)
+- Collector for a deferred long suite: inline template in Long-Running Verification (cheapest tier, no task context)
 - Final whole-branch review: use superpowers:requesting-code-review's [code-reviewer.md](../requesting-code-review/code-reviewer.md)
 
 ## Example Workflow
@@ -331,7 +384,7 @@ Missing evidence means the task remains open even when the implementation appear
 
 ## Red Flags
 
-**Never:** - Start implementation on main/master branch without explicit user consent - Skip task review, or accept report missing either verdict (spec compliance AND task quality both required) - Proceed with unfixed issues - Dispatch multiple implementation subagents in parallel — they share one working tree and HEAD, so commits and test runs trample each other, and the review gate is sequential by design (each task reviewed before the next builds on it) - Read all task files into own context (read index only; hand each subagent its task-file path, let it read own task) - Compose any dispatch from memory instead of filling its template — implementer, task reviewer, re-review, fix, final review (or name an `implementer-common.md` that was gisted rather than relocated verbatim) - Drop a template section because it reads like boilerplate (Calibration, Do Not Trust the Report, Evidence Contract, Output Format) — that is what makes verdicts comparable across tasks - Improvise around a template that fits badly instead of editing the template file - Tell any subagent to `sed`/`grep`/`head` a section out of a bigger file (`sed -n '/## Global Constraints/,/^## /p' plan.md | head -200`) — hand whole files; missing file gets created, not carved out - Paste global constraints into a reviewer prompt instead of handing `plan/global-constraints.md` — pasted constraint reaches that one reviewer and no later implementer - Guess which layer constraint files a task needs from its title, or hand all of them "to be safe" — route off plan's written `**Layers:**` annotation; unannotated task = plan bug, not judgment call - Hand reviewer a different constraint file set than implementer got — reviewer then flags rule implementer never saw, or misses one nobody checked - Make subagent read whole plan (hand single task-file path instead) - Skip scene-setting context (subagent needs where task fits) - Ignore subagent questions (answer before they proceed) - Accept "close enough" on spec compliance (reviewer found spec issues = not done) - Skip review loops (reviewer found issues = implementer fixes = review again) - Let implementer self-review replace actual review (both needed) - Tell reviewer what not to flag, or pre-rate finding severity in dispatch prompt ("treat it as Minor at most") — plan's example code = starting point, not evidence its weaknesses were chosen - Dispatch task reviewer without diff file — generate first (`scripts/review-package PLAN_FILE BASE HEAD`), name printed path in prompt - Move to next task while review has open Critical/Important issues - Re-dispatch task progress ledger already marks complete — check ledger (and `git log`) after any compaction or resume - Resolve a plan contradiction verbally without editing the plan files — the next subagent reads the stale text (see Plan Amendments)
+**Never:** - Start implementation on main/master branch without explicit user consent - Skip task review, or accept report missing either verdict (spec compliance AND task quality both required) - Proceed with unfixed issues - Dispatch multiple implementation subagents in parallel — they share one working tree and HEAD, so commits and test runs trample each other, and the review gate is sequential by design (each task reviewed before the next builds on it) - Read all task files into own context (read index only; hand each subagent its task-file path, let it read own task) - Compose any dispatch from memory instead of filling its template — implementer, task reviewer, re-review, fix, final review (or name an `implementer-common.md` that was gisted rather than relocated verbatim) - Drop a template section because it reads like boilerplate (Calibration, Do Not Trust the Report, Evidence Contract, Output Format) — that is what makes verdicts comparable across tasks - Improvise around a template that fits badly instead of editing the template file - Tell any subagent to `sed`/`grep`/`head` a section out of a bigger file (`sed -n '/## Global Constraints/,/^## /p' plan.md | head -200`) — hand whole files; missing file gets created, not carved out - Paste global constraints into a reviewer prompt instead of handing `plan/global-constraints.md` — pasted constraint reaches that one reviewer and no later implementer - Guess which layer constraint files a task needs from its title, or hand all of them "to be safe" — route off plan's written `**Layers:**` annotation; unannotated task = plan bug, not judgment call - Hand reviewer a different constraint file set than implementer got — reviewer then flags rule implementer never saw, or misses one nobody checked - Make subagent read whole plan (hand single task-file path instead) - Skip scene-setting context (subagent needs where task fits) - Ignore subagent questions (answer before they proceed) - Accept "close enough" on spec compliance (reviewer found spec issues = not done) - Skip review loops (reviewer found issues = implementer fixes = review again) - Let implementer self-review replace actual review (both needed) - Tell reviewer what not to flag, or pre-rate finding severity in dispatch prompt ("treat it as Minor at most") — plan's example code = starting point, not evidence its weaknesses were chosen - Dispatch task reviewer without diff file — generate first (`scripts/review-package PLAN_FILE BASE HEAD`), name printed path in prompt - Move to next task while review has open Critical/Important issues - Re-dispatch task progress ledger already marks complete — check ledger (and `git log`) after any compaction or resume - Resolve a plan contradiction verbally without editing the plan files — the next subagent reads the stale text (see Plan Amendments) - Let any agent wait on a job with `sleep` over 240s, or sleep out a whole wait in one Bash call — above the 5-min prompt-cache TTL every poll re-charges its entire context at write price (see Long-Running Verification) - Leave the implementer holding the task's context as the agent that waits for a long suite, or resume it with `SendMessage` to collect the result — dispatch a fresh cheapest-tier collector with the sentinel path and nothing else - Run a multi-hour suite once per task when the plan can gate it once per batch - Launch a job over ~30 minutes with the harness's background flag instead of `setsid nohup` — it gets reaped mid-run and the suite is paid for twice
 
 **If subagent asks questions:** - Answer clear and complete - Provide extra context if needed - No rushing into implementation
 

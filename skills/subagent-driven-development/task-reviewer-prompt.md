@@ -53,6 +53,8 @@ Subagent (general-purpose):
 
     Warnings or noise in implementer's reported test output = findings — test output should be pristine.
 
+    Report list suite under **Deferred verification** → controller's batch gate own it, not you. No run it, no flag its absent evidence as finding. Deferred suite the plan never defers, or evidence missing for suite implementer should have run → that IS finding.
+
     ## Part 1: Spec Compliance
 
     Compare diff against What Was Requested:

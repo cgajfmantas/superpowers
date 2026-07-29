@@ -23,7 +23,7 @@ If a plan predates the split and still keeps Global Constraints inside `plan.md`
 
 ## Factoring Out the Invariant Half
 
-Everything in this template except **Task Description**, **Context**, **Execution Context and Lessons**, and **Workspace Constraint** is identical across every task in a run. Writing it into each dispatch verbatim is fine. Writing it once to `…/sdd/implementer-common.md` and having the dispatch say "read this first — role boundary, workspace rules, TDD and verification requirements, report contract" is also fine, and cheaper.
+Everything in this template except **Task Description**, **Context**, **Execution Context and Lessons**, and **Workspace Constraint** is identical across every task in a run. Writing it into each dispatch verbatim is fine. Writing it once to `…/sdd/implementer-common.md` and having the dispatch say "read this first — role boundary, workspace rules, context budget, TDD and verification requirements, report contract" is also fine, and cheaper.
 
 If you factor it out: the common file must carry the invariant sections **complete and verbatim** — it is the template, relocated, not a summary of it. The per-task dispatch then carries the four varying sections plus the paths (`[BRIEF_FILE]`, `[GLOBAL_CONSTRAINTS_FILES]`, `[REPORT_FILE]`). A dispatch that names a common file which was never written from this template, or which was written as a condensed gist of it, is a template violation.
 
@@ -104,7 +104,7 @@ Subagent (general-purpose):
     **While you work:** If you encounter something unexpected or unclear, pause and report NEEDS_CONTEXT. Do not guess or make unsupported assumptions. Questions requiring human input go through the controller's ask tool.
     If the controller's answer contradicts your task brief, the controller updates the brief file — re-read it and follow the updated text, don't improvise over the stale version.
 
-    While iterating, run the focused test for what you're changing; run the full suite once before committing, not after every edit.
+    While iterating, run the focused test for what you're changing; run the full suite once before committing, not after every edit. Suites the plan defers to a batch gate are covered under Long-Running Verification below — do not run them here.
 
     ## Code Organization
 
@@ -114,6 +114,25 @@ Subagent (general-purpose):
     - If a file you're creating is growing beyond the plan's intent, stop and report it as DONE_WITH_CONCERNS — don't split files on your own without plan guidance
     - If an existing file you're modifying is already large or tangled, work carefully and note it as a concern in your report
     - In existing codebases, follow established patterns. Improve code you're touching the way a good developer would, but don't restructure things outside your task.
+
+    ## Context Budget
+
+    Your context only grows — nothing compacts it, and it is re-sent in full on every turn you take. A wasteful read is not paid once; it is paid again on every remaining turn of the task.
+
+    - Read each file once. To revisit part of a file you already read, use your read tool's offset/limit instead of re-reading it whole. A successful edit is its own confirmation — never re-read a file to check that your edit landed.
+    - Write scripts longer than a few lines to a file and run them by path. A long heredoc inside a shell command is stored in your context as part of the command.
+    - Keep verification output narrow. Redirect long test and build logs to a file and inspect the summary lines; don't let thousands of lines land in the transcript.
+    - Delegate broad investigation to a subagent and ask for its conclusion. Reading twenty files yourself to answer one question puts all twenty in your context permanently; a subagent's answer costs you a paragraph.
+    - Past roughly 200k tokens of context, stop and take stock: what remains, and what of it can be delegated. Still growing context without progress is the "reading file after file without progress" signal below — escalate rather than push on.
+
+    ## Long-Running Verification
+
+    Anything taking more than about four minutes to run — full end-to-end batteries, whole-repo builds, long integration suites — belongs to the controller, not to you. You hold this task's entire context, and every minute you spend waiting is billed against it. Four minutes is the threshold because the prompt cache expires at five: a wait that crosses it makes your next turn re-charge your whole context at the write rate.
+
+    - Your brief and constraint files name the suites the plan defers to a batch gate. Run the focused tests for your change plus the fast suite; report the deferred ones as deferred, and do not run them "to be thorough."
+    - If your brief genuinely requires a long suite before this task can be called done: launch it detached (`setsid nohup <cmd> > <log> 2>&1 &`, or the controller's `await-job start` if you were handed it), then stop with status AWAITING_VERIFICATION, reporting the launch command, the log path, and the sentinel path. Do not wait for it yourself — the controller dispatches a cheap collector that does nothing but wait.
+    - If you must poll something yourself, never sleep more than 240 seconds per poll, and never try to sleep out the whole wait in one call. A longer pause expires the prompt cache and makes the next poll re-charge your entire context at the write rate — the single most expensive mistake observed in this role.
+    - Do not use the harness's background-execution flag for jobs over ~30 minutes; it can be reaped when the turn ends, and you will pay for the run twice. Detach properly instead.
 
     ## When You're in Over Your Head
 
@@ -177,6 +196,7 @@ Subagent (general-purpose):
       - RED: command run, relevant failing output before implementation, and why the failure was expected
       - GREEN: command run and relevant passing output after implementation
     - Files changed
+    - Deferred verification: each long suite the plan routes to a batch gate, or that you launched but did not collect — name it, and give the log and sentinel paths (or `None`)
     - Delegated work: subagent scope, result, and how you verified it (or `None`)
     - Requirement and declared-test-case traceability to implementation evidence
     - Self-review findings (if any)
@@ -184,13 +204,13 @@ Subagent (general-purpose):
     - Any issues or concerns
 
     Then report back with ONLY (under 15 lines — the detail lives in the report file):
-    - **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+    - **Status:** DONE | DONE_WITH_CONCERNS | AWAITING_VERIFICATION | BLOCKED | NEEDS_CONTEXT
     - Commits created (short SHA + subject)
     - One-line test summary (e.g. "14/14 passing, output pristine")
     - Your concerns, if any
     - The report file path
 
-    If BLOCKED or NEEDS_CONTEXT, put the specifics in the final message itself — the controller acts on it directly.
+    If BLOCKED, NEEDS_CONTEXT, or AWAITING_VERIFICATION, put the specifics in the final message itself — the controller acts on it directly. For AWAITING_VERIFICATION that means the launch command, the log path, and the sentinel path.
 
-    Use DONE_WITH_CONCERNS if you completed the work but have doubts about correctness. Use BLOCKED if you cannot complete the task. Use NEEDS_CONTEXT if you need information that wasn't provided. Never silently produce work you're unsure about.
+    Use DONE_WITH_CONCERNS if you completed the work but have doubts about correctness. Use AWAITING_VERIFICATION if the work is complete and committed but a long suite your brief requires is still running — see Long-Running Verification. Use BLOCKED if you cannot complete the task. Use NEEDS_CONTEXT if you need information that wasn't provided. Never silently produce work you're unsure about.
 ```
