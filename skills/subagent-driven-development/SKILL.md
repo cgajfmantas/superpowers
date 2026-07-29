@@ -104,7 +104,7 @@ Before Task 1, read plan index (task list) and every constraint file it links �
 - layer-split plan whose index annotates a task with a layer that has no file, or leaves a task unannotated
 - constraint mandates something review rubric treats as defect (test asserting nothing, verbatim duplicated logic block)
 - a long suite declared without saying **what it observes** — plan can then only trigger it by task number, so no task can ever be exempted on evidence (see Long-Running Verification, and writing-plans § Declaring a Long Suite)
-- **task whose working set is too big to hold at once.** Plan's File Structure section maps files to tasks, in the index you are already reading, so `wc -c` on that map costs one command and no task bodies. Task pointing at a file of tens of KB — or several files summing to that — is a splitting candidate. Measured: a task with 81KB across 4 files, one 61KB, became its run's most expensive *and* shipped two evidence defects needing a remediation task; its implementer re-read the largest file 9 times because it would not stay in the working set.
+- **task whose working set is too big to hold at once.** Plan's File Structure section maps files to tasks, in the index you are already reading, so `wc -c` on that map costs one command and no task bodies. Task pointing at a file of tens of KB — or several files summing to that — is a splitting candidate. Measured: a task with 81KB across 4 files, one 61KB, had its implementer re-read the largest file 9 times because it would not stay in the working set — and it shipped two evidence defects that needed a remediation task.
 
 No reading every task file upfront — index catches plan-level conflicts; per-task review loop nets conflicts that only emerge from implementation. Need one task's detail → read that one file, not all.
 
@@ -161,7 +161,7 @@ Use least powerful model that handles each role. Cheaper, faster.
 
 Verification taking more than ~4 minutes does not run inside implementer. Controller owns it.
 
-**Why:** subagent context grows monotonically — nothing compacts it, and every turn re-sends it whole. Pause longer than the prompt-cache TTL (5 min) and that whole context re-caches at write price instead of read price. Measured on one real task: 22 polls of `sleep 570` against a 2h11m e2e battery, at 630k tokens of context, cost ~$2.36 per idle poll — $57 for zero work, more than the 349 requests that did the actual implementation. Same session's earlier `sleep 300` polls cost $0.18 each.
+**Why:** subagent context grows monotonically — nothing compacts it, and every turn re-sends it whole. Pause longer than the prompt-cache TTL (5 min) and that whole context re-caches at write price instead of read price, which is **an order of magnitude more per turn for an agent that did nothing**. Measured on one real task: 22 polls of `sleep 570` against a 2h11m battery, at 630k tokens of context. The waiting consumed more than the 349 requests that did the implementation; polls under the TTL in the same session cost a thirteenth as much each.
 
 Two patterns, in order of preference:
 
@@ -169,7 +169,7 @@ Two patterns, in order of preference:
 
 **Hoist long suites to batch gates — and then no one polls at all.** Plan names its long suites in `plan/global-constraints.md`. Implementer runs focused tests plus the fast suite, and reports `Deferred verification: <suite>`. Controller runs the long suite once per batch, not once per task — a 2-hour battery per task across a 34-task plan is 68 hours of compute for a signal that rarely changes. Batch boundary = wherever the plan sets one, else after each task the plan marks as affecting that suite, and always before final whole-branch review. Because the controller stays alive across the wait, it launches the suite with the harness's background execution and is notified when it exits: **no sentinel, no collector, no poll turns.** Prefer this pattern for that reason as much as for the compute it saves.
 
-**Per-task long job that genuinely cannot be deferred:** implementer launches it detached, returns AWAITING\_VERIFICATION with log and sentinel paths, and exits. Controller dispatches a **fresh cheapest-tier collector** whose only job is waiting — sentinel path in, one-line result out. Its context is a few thousand tokens, so the poll costing $2.36 from inside the implementer costs a fraction of a cent. Never resume the implementer to wait: resuming restores its full context, which is the cost this pattern exists to avoid.
+**Per-task long job that genuinely cannot be deferred:** implementer launches it detached, returns AWAITING\_VERIFICATION with log and sentinel paths, and exits. Controller dispatches a **fresh cheapest-tier collector** whose only job is waiting — sentinel path in, one-line result out. Its context is a few thousand tokens against the implementer's hundreds of thousands, so the same poll costs a rounding error. Never resume the implementer to wait: resuming restores its full context, which is the cost this pattern exists to avoid.
 
 This is the only pattern that needs a sentinel and a collector, and the reason is structural rather than incidental: the implementer stops, so the harness has no live agent to notify. Everything else should reach for background execution instead.
 
@@ -292,22 +292,14 @@ Conversation memory no survive compaction. Real sessions: controllers that lost 
 - Ledger lives in run's workspace — `progress.md` inside directory `scripts/sdd-workspace PLAN_FILE` prints (PLAN\_FILE = plan index path). Directory = `sdd/` sibling of plan's folder: `$HOME/.superpowers/YYYY/<feature-name>/sdd/` (`YYYY` = current year, e.g. `2026` — never literal `YYYY`), outside repo — shared across git worktrees, survives `git clean`.
 - At skill start, check for ledger: `cat "$(scripts/sdd-workspace PLAN_FILE)/progress.md"`. Tasks marked complete there = DONE — no re-dispatch; resume at first task not marked complete.
 - Before dispatching each task, append the entry gate's snapshot as one line: `Task N: dispatched (base <head7>, pre-existing: <git status --short output, or the word clean>)`. Cheap, and it is what lets a cold-resumed controller still tell this task's changes from what was already in the tree.
-- Task review comes back clean → append one ledger line in same message as other bookkeeping: `Task N: complete (commits <base7>..<head7>, review clean, $<cost> / <expiry>% idle)`. Cost and idle share come from `scripts/run-cost` (see below) — without a number in the ledger a $105 task and an $8 task read identically, and the class of waste that produced them stays invisible until someone hand-parses transcripts.
+- Task review comes back clean → append one ledger line in same message as other bookkeeping: `Task N: complete (commits <base7>..<head7>, review clean)`.
 - Ledger = recovery map: commits it names exist in git even when context no longer remembers creating them. After compaction, trust ledger and `git log` over own recollection.
 
-### Knowing What a Run Cost
-
-`scripts/run-cost RUN` reads the harness's own transcripts and prints per-agent cost for one run, with a total. `RUN` is either the controller's session transcript or its session directory — Claude Code stores the two halves as siblings (`<session-id>.jsonl` beside `<session-id>/subagents/`), and the script resolves both from either. Pointing at only the directory omits the controller, which is the agent whose spend is least visible.
-
-The actionable column is **EXPIRY**: tokens re-cached in a single turn because a gap exceeded the prompt-cache TTL. That is spend on content that did not change — the signature of an agent that waited badly. On the run this section's figures come from it was 37% of a $792 total.
-
-Two counting rules the script exists to get right, both of which were got wrong by hand first: the raw JSONL logs every request more than once, so dedup by `requestId` or double every figure; and cache prices are multiples of a model's base input price (write 1.25× at the 5-minute TTL, 2× at 1 hour, read 0.1×), so a recalled per-model write price is not a substitute for reading the TTL out of the transcript. Getting the second wrong mis-stated one controller by 3×, then by a further 20%.
-
-### Controller Context Is a Cost, Not Only a Risk
+### Keep the Ledger Resume-Sufficient
 
 Ledger exists so a controller that lost its memory can recover. Same property makes the controller **disposable** — and nothing above says to use that deliberately.
 
-Measured, one 34-task run: controller 305 requests across 4 days, context 540k peak and 294k average, its own artefacts only ~117k tokens — the rest is its own accumulated reasoning. **$104.95, tied with the run's most expensive implementer, and it writes no code.** 53% of that is `cache_read`, which is nothing but context size × request count. Another 35% is 11 whole-context re-caches at 5–7h gaps while waiting on implementers — gaps no cache-TTL change reaches, since they exceed even the 1h TTL that session had. Same run at 50k instead of 294k costs ~$18.
+Worth doing on its own terms: a controller's context grows monotonically across a long run, its own accumulated reasoning far outweighing the artefacts it handled, and every later turn re-sends all of it. A run of 34 tasks left one controller carrying five times the context its bookkeeping needed.
 
 **A controller cannot reset its own context** — no tool does it, `/clear` belongs to the human partner. So this is not a step to schedule. It is an invariant to hold, so that a reset is free whenever one happens:
 

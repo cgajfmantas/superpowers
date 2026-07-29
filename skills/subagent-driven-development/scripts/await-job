@@ -4,11 +4,11 @@
 #
 # Two costs make a naive wait expensive. A subagent's context is re-sent whole
 # on every turn, and a pause longer than the 5-minute prompt-cache TTL makes
-# the next turn re-cache all of it at write price instead of read price. One
-# real task polled a 2h11m suite with `sleep 570` and paid ~$2.36 per idle
-# poll — $57 to wait. The same session's `sleep 300` polls cost $0.18 each.
-# So: each `wait` invocation sleeps at most MAX_INTERVAL and returns, and the
-# caller polls again. Never sleep out a whole wait in one call.
+# the next turn re-cache all of it at write price instead of read price —
+# roughly thirteen times more per idle poll, measured on one real task that
+# polled a 2h11m suite with `sleep 570` and spent more waiting than it spent
+# implementing. So: each `wait` invocation sleeps at most MAX_INTERVAL and
+# returns, and the caller polls again. Never sleep out a whole wait in one call.
 #
 # The harness's own background-execution flag is not enough either: it can be
 # reaped when the turn or session moves on. Two runs of that same suite died

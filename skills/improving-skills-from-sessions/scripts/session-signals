@@ -1,0 +1,372 @@
+#!/usr/bin/env bash
+# Extract the behavioural signals from a run's transcripts, so an analysis
+# does not start by hand-parsing JSONL. One subcommand per signal in
+# reading-transcripts.md.
+#
+# Deliberately reports no money. Cache rates and the cost table live in
+# run-cost and nowhere else, so there is one place to get them wrong.
+#
+# Shares one rule with run-cost: the raw JSONL logs each request more than
+# once, so requests are dedup'd by requestId and tool calls by tool_use id.
+# Counting either naively inflates every figure here.
+#
+# Usage:
+#   session-signals statuses RUN [--json]    how dispatches ended; rework per task
+#   session-signals reads RUN [--json]       files read more than once
+#   session-signals tools RUN [PATTERN]      tool-call census; absence check
+#   session-signals gaps RUN [--json]        idle re-cache turns + gap histogram
+#   session-signals context RUN [--json]     context growth per agent
+#
+# RUN is either half of the session pair — <session-id>.jsonl or
+# <session-id>/ — since Claude Code stores the controller transcript beside
+# the subagents directory rather than inside it.
+set -euo pipefail
+
+die() {
+  echo "error: $*" >&2
+  exit 2
+}
+
+usage() {
+  sed -n '/^# Usage:/,/^#   session-signals tools/p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+[ $# -ge 2 ] || {
+  usage >&2
+  exit 2
+}
+
+action=$1
+target=$2
+shift 2
+
+pattern=""
+as_json=false
+while [ $# -gt 0 ]; do
+  case $1 in
+    --json) as_json=true ;;
+    -*) die "unknown option: $1" ;;
+    *) pattern=$1 ;;
+  esac
+  shift
+done
+
+case $action in
+  statuses | gaps | context | reads | tools) ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *) die "unknown subcommand: $action" ;;
+esac
+
+target=${target%/}
+target=${target%.jsonl}
+[ -f "$target.jsonl" ] || [ -d "$target" ] \
+  || die "no run at $target — expected $target.jsonl or $target/"
+
+command -v python3 >/dev/null 2>&1 || die "python3 is required"
+
+ACTION=$action TARGET=$target PATTERN=$pattern AS_JSON=$as_json python3 - <<'PY'
+import json
+import os
+import re
+import sys
+import datetime as dt
+from collections import Counter, defaultdict
+from glob import glob
+
+ACTION = os.environ["ACTION"]
+TARGET = os.environ["TARGET"]
+PATTERN = os.environ["PATTERN"]
+AS_JSON = os.environ["AS_JSON"] == "true"
+
+EXPIRY_THRESHOLD = 100_000   # a single turn writing more than this re-cached a prefix
+
+
+def transcripts(stem):
+    """Both halves of a run: the controller transcript and every subagent."""
+    out = []
+    if os.path.exists(stem + ".jsonl"):
+        out.append(("CONTROLLER", stem + ".jsonl"))
+    for path in sorted(glob(os.path.join(stem, "subagents", "*.jsonl"))):
+        meta = path.replace(".jsonl", ".meta.json")
+        label = os.path.basename(path).replace(".jsonl", "")
+        if os.path.exists(meta):
+            try:
+                label = json.load(open(meta)).get("description") or label
+            except (json.JSONDecodeError, OSError):
+                pass
+        out.append((label, path))
+    return out
+
+
+def rows(path):
+    for line in open(path, errors="replace"):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            yield json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+
+def requests_of(path):
+    """Dedup by requestId; the raw log repeats each request."""
+    seen, order = {}, []
+    for r in rows(path):
+        msg = r.get("message") or {}
+        usage = msg.get("usage")
+        if not usage or not r.get("timestamp"):
+            continue
+        key = r.get("requestId") or msg.get("id")
+        if key not in seen:
+            order.append(key)
+        seen[key] = {
+            "at": dt.datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00")),
+            "write": usage.get("cache_creation_input_tokens", 0),
+            "read": usage.get("cache_read_input_tokens", 0),
+            "out": usage.get("output_tokens", 0),
+        }
+    return [seen[k] for k in order]
+
+
+STATUS_TOKENS = (
+    "AWAITING_VERIFICATION", "DONE_WITH_CONCERNS", "NEEDS_CONTEXT",
+    "BLOCKED", "DONE",
+)
+
+
+def final_text(path):
+    """Concatenated text of the last assistant message that carried any."""
+    last = ""
+    for r in rows(path):
+        if r.get("type") != "assistant":
+            continue
+        content = (r.get("message") or {}).get("content")
+        if not isinstance(content, list):
+            continue
+        text = " ".join(b.get("text", "") for b in content
+                        if isinstance(b, dict) and b.get("type") == "text")
+        if text.strip():
+            last = text
+    return last
+
+
+def outcome_of(text):
+    """Implementer status token, or a reviewer verdict, or unknown."""
+    for token in STATUS_TOKENS:      # longest-first: DONE_WITH_CONCERNS before DONE
+        if token in text:
+            return token
+    low = text.lower()
+    if "needs fixes" in low or "❌" in text:
+        return "REVIEW_REJECTED"
+    if "approved" in low or "✅" in text:
+        return "REVIEW_APPROVED"
+    return "unknown"
+
+
+def role_of(label):
+    low = label.lower()
+    if low.startswith("controller"):
+        return "controller"
+    if low.startswith(("review", "re-review")):
+        return "reviewer"
+    if low.startswith(("fix", "re-verify")) or "remediation" in low or "bugfix" in low:
+        return "fixer"
+    if low.startswith("implement"):
+        return "implementer"
+    return "other"
+
+
+def task_of(label):
+    """Task number from a dispatch description, e.g. 'Implement Task 13: ...'."""
+    m = re.search(r"task\s*0*(\d+)", label, re.I)
+    return m.group(1) if m else "-"
+
+
+def tool_calls(path):
+    """Dedup by tool_use id — the same block appears in repeated log lines."""
+    seen = {}
+    for r in rows(path):
+        content = (r.get("message") or {}).get("content")
+        if not isinstance(content, list):
+            continue
+        for b in content:
+            if isinstance(b, dict) and b.get("type") == "tool_use":
+                seen[b.get("id")] = (b.get("name"), b.get("input") or {})
+    return list(seen.values())
+
+
+runs = transcripts(TARGET)
+if not runs:
+    print("no transcripts found", file=sys.stderr)
+    sys.exit(1)
+result = {}
+
+
+if ACTION == "statuses":
+    # How each dispatch ended, and what that implies about the review gate.
+    # Rework and extra review rounds are the planner's and reviewer's marks.
+    per_task = defaultdict(lambda: defaultdict(int))
+    census = Counter()
+    detail = []
+    for label, path in runs:
+        role = role_of(label)
+        if role == "controller":
+            continue
+        outcome = outcome_of(final_text(path))
+        census[outcome] += 1
+        task = task_of(label)
+        per_task[task][role] += 1
+        per_task[task]["outcomes"] = per_task[task].get("outcomes", 0)
+        detail.append({"task": task, "role": role, "outcome": outcome,
+                       "agent": label})
+    # Dispatches whose description carries no task number land under "-";
+    # they cannot be attributed to a task, so keep them out of the rates.
+    rework = {t: c for t, c in per_task.items()
+              if t != "-" and c.get("fixer", 0) > 0}
+    rounds = {t: c for t, c in per_task.items()
+              if t != "-" and c.get("reviewer", 0) > 1}
+    result = {"census": dict(census), "dispatches": detail,
+              "tasks_with_rework": sorted(rework), "tasks_with_extra_rounds": sorted(rounds)}
+    if not AS_JSON:
+        print("how dispatches ended:")
+        for outcome, n in census.most_common():
+            print(f"  {n:>4}  {outcome}")
+        tasks = [t for t in per_task if t != "-"]
+        print(f"\ntasks seen: {len(tasks)}")
+        print(f"  needed a fix dispatch:      {len(rework)}"
+              f"  {sorted(rework, key=int) if rework else ''}")
+        print(f"  needed >1 review round:     {len(rounds)}"
+              f"  {sorted(rounds, key=int) if rounds else ''}")
+        if tasks:
+            share = 100 * len(rework) / len(tasks)
+            print(f"\nrework rate {share:.0f}%. Rework concentrated in a few tasks "
+                  "points at how those tasks were scoped; rework spread evenly "
+                  "points at the brief contract or the review gate.")
+        unknown = census.get("unknown", 0)
+        if unknown:
+            print(f"\n{unknown} dispatch(es) ended with no recognisable status — "
+                  "either the report contract was not followed, or the run "
+                  "predates it. Check the skill revision for that date.")
+
+
+elif ACTION == "gaps":
+    # An expiry re-cache is a single turn writing a whole prefix again. The
+    # gap before it is what expired the cache; a spike at a round value is an
+    # agent sleeping past the TTL on purpose.
+    events, per_agent = [], {}
+    for label, path in runs:
+        reqs = requests_of(path)
+        hits = []
+        for i, req in enumerate(reqs):
+            if req["write"] > EXPIRY_THRESHOLD and i > 0:
+                gap = (req["at"] - reqs[i - 1]["at"]).total_seconds()
+                hits.append({"gap_s": round(gap), "write": req["write"]})
+                events.append(gap)
+        if hits:
+            per_agent[label] = hits
+    result = {"threshold": EXPIRY_THRESHOLD, "turns": len(events), "by_agent": per_agent}
+    if not AS_JSON:
+        print(f"idle re-cache turns (>{EXPIRY_THRESHOLD:,} written in one turn, "
+              f"excluding each agent's first request): {len(events)}")
+        if events:
+            tok = sum(h["write"] for hs in per_agent.values() for h in hs)
+            print(f"tokens re-cached: {tok:,}   agents affected: "
+                  f"{len(per_agent)} of {len(runs)}")
+            print("\ngap before each, by minute:")
+            hist = Counter(int(g // 60) for g in events)
+            for minute in sorted(hist):
+                print(f"  {minute:>3}-{minute + 1:<3} min {hist[minute]:>4} "
+                      f"{'#' * min(hist[minute], 60)}")
+            print("\nworst agents:")
+            for label, hs in sorted(per_agent.items(),
+                                    key=lambda x: -sum(h["write"] for h in x[1]))[:8]:
+                gaps = sorted(h["gap_s"] for h in hs)
+                mid = gaps[len(gaps) // 2]
+                print(f"  {label[:46]:<46} {len(hs):>3} turns  median gap {mid:>4}s")
+            print("\nA spike at one value is deliberate sleeping, not slow commands.")
+
+
+elif ACTION == "context":
+    table = []
+    for label, path in runs:
+        reqs = requests_of(path)
+        if not reqs:
+            continue
+        ctx = [r["write"] + r["read"] for r in reqs]
+        span = (reqs[-1]["at"] - reqs[0]["at"]).total_seconds() / 60
+        table.append({
+            "agent": label, "requests": len(reqs), "first": ctx[0],
+            "peak": max(ctx), "last": ctx[-1],
+            "mean": round(sum(ctx) / len(ctx)), "minutes": round(span),
+        })
+    table.sort(key=lambda r: -r["peak"])
+    result = {"agents": table}
+    if not AS_JSON:
+        print(f"{'AGENT':<46} {'REQS':>5} {'FIRST':>8} {'PEAK':>8} {'MEAN':>8} {'MINS':>5}")
+        print("-" * 84)
+        for r in table:
+            print(f"{r['agent'][:46]:<46} {r['requests']:>5} {r['first']:>8,} "
+                  f"{r['peak']:>8,} {r['mean']:>8,} {r['minutes']:>5}")
+        print("\nMEAN is what every request paid. Growth with no drop means "
+              "nothing compacted.")
+
+
+elif ACTION == "reads":
+    table = []
+    for label, path in runs:
+        counts = Counter()
+        for name, inp in tool_calls(path):
+            if name == "Read" and inp.get("file_path"):
+                counts[inp["file_path"]] += 1
+        repeats = {f: n for f, n in counts.items() if n > 1}
+        if repeats:
+            table.append({
+                "agent": label,
+                "wasted_reads": sum(n - 1 for n in repeats.values()),
+                "files": sorted(repeats.items(), key=lambda x: -x[1]),
+            })
+    table.sort(key=lambda r: -r["wasted_reads"])
+    result = {"agents": table}
+    if not AS_JSON:
+        if not table:
+            print("no file read more than once")
+        for r in table[:10]:
+            print(f"{r['agent'][:60]}  ({r['wasted_reads']} redundant reads)")
+            for f, n in r["files"][:6]:
+                size = os.path.getsize(f) if os.path.exists(f) else None
+                shown = f"{size:,}B" if size is not None else "size unknown"
+                print(f"    {n}x  {shown:>14}  {f}")
+        print("\nRepeated reads of a large file mean the working set does not fit "
+              "— usually a task-sizing problem, not indiscipline.")
+
+
+elif ACTION == "tools":
+    census, absent = {}, []
+    for label, path in runs:
+        counts = Counter(name for name, _ in tool_calls(path))
+        census[label] = dict(counts)
+        if PATTERN and not any(PATTERN.lower() in n.lower() for n in counts):
+            absent.append((label, sum(counts.values())))
+    result = {"census": census, "pattern": PATTERN, "absent": absent}
+    if not AS_JSON:
+        total = Counter()
+        for counts in census.values():
+            total.update(counts)
+        print("tool calls across the run:")
+        for name, n in total.most_common():
+            print(f"  {n:>6}  {name}")
+        if PATTERN:
+            print(f"\nagents never calling anything matching {PATTERN!r}: "
+                  f"{len(absent)} of {len(runs)}")
+            for label, n in sorted(absent, key=lambda x: -x[1])[:10]:
+                print(f"  {label[:56]:<56} {n:>5} tool calls, none matching")
+            print("\nAbsence is evidence: guidance that asks for a tool no agent "
+                  "ever called is decoration, and should be deleted.")
+
+if AS_JSON:
+    print(json.dumps(result, indent=2, default=str))
+PY
