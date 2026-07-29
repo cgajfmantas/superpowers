@@ -56,6 +56,12 @@ Structure informs task decomposition. Each task produces self-contained changes 
 
 Task = smallest unit with own test cycle, worth fresh reviewer's gate. Drawing boundaries: fold setup, configuration, scaffolding, docs into task whose deliverable needs them; split only where reviewer could reject one task, approve neighbor. Each task ends with independently testable deliverable.
 
+**Independence is necessary, not sufficient — size the working set too.** Rule above draws boundaries by deliverable and reviewer gate. Task can pass that test and still be too big, because nothing in it counts how much *existing* code the implementer must hold at once. Add up bytes of files the task modifies, plus their tests and any page or fixture it must touch.
+
+Measured, one real task: 4 SFCs totalling **81KB, one of them 61KB alone**. Clean unit by every rule above — one widget subtree, one test cycle, one reviewer gate. Its implementer read the 61KB file **9 times** and its sibling 8 times, because four files that size do not fit a working set at once. That task became its run's most expensive (~$105, about half of it idle re-caching) **and** shipped two evidence defects that needed a follow-up remediation task. Cost and quality failed together, from the one cause.
+
+File Structure above already says prefer smaller focused files — that covers files the plan *creates*. This covers files the plan *touches*. In existing codebase you often cannot shrink them, so split the task instead: one file per task where files are large, even where a reviewer could have approved them together.
+
 ## Bite-Sized Task Granularity
 
 **Each step one action (2-5 minutes):**
@@ -113,6 +119,22 @@ Binds every task in this plan. Task files do not restate these.
 ```
 
 Keep it short enough to read whole: only what binds many tasks. Task-specific values live in the task file.
+
+### Declaring a Long Suite
+
+Suite taking more than a few minutes — end-to-end battery, whole-repo build, long integration run — gets declared here, and the declaration carries **three** things, not one:
+
+1. **How to run it**, exact command.
+2. **What counts as a pass.** Rarely "all green" on a branch with pre-existing failures — usually zero difference against a named reference run.
+3. **What the suite can observe.** The part plans skip, and the expensive omission.
+
+Third one is what lets a task be exempted on evidence instead of on a guess. Write the trigger as a **property of the diff**, not a list of task numbers: "runs when the change touches routing, a network call, or a component's public API" is checkable; "runs on tasks 13, 16, 18–25" is a guess frozen into the plan, and it decays as tasks move.
+
+Why it matters, measured: one plan triggered a 214-spec, 2h11m battery on a task whose whole diff was `<style scoped>` blocks in four widgets. Plan's own words for the trigger list were "cover by excess when in doubt" — precaution, not analysis. Across that plan's triggering tasks it is tens of hours of compute for a signal whose expected information content was near zero.
+
+**Be conservative, and put the burden on the declaration rather than the exemption.** A wrong exemption is a missed regression, which costs far more than the suite it skipped. So: no exemption unless this file says what the suite observes and the diff demonstrably touches none of it. Cannot describe what the suite observes → suite runs. Silence is not an exemption.
+
+Execution side of this rule lives in `superpowers:subagent-driven-development` § Long-Running Verification. It applies what you declare here; it does not get to invent an exemption you did not write.
 
 ### Splitting by Layer
 

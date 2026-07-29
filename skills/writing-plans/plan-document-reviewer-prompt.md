@@ -36,6 +36,8 @@ Subagent (general-purpose):
 
     Your review is read-only: report issues, never edit the plan or any other file. Review the documents themselves — do not crawl the codebase; each task file must stand on its own for an implementer with zero context.
 
+    One bounded exception to that: for the Working Set check below you may run `wc -c` on the existing files the plan's File Structure section names. Measuring the size of a list the plan already declares is not crawling the codebase — do not open or read those files.
+
     ## What to Check
 
     | Category | What to Look For |
@@ -46,6 +48,8 @@ Subagent (general-purpose):
     | Contract Completeness | Each task has exact signatures in Interfaces, Behavior with edge cases, test cases as data (input → expected output) an implementer can turn into real tests |
     | Self-Containment | Could a reader with zero context execute each task file alone? Name what's missing |
     | Task Decomposition | Tasks have clear boundaries, steps are actionable |
+    | Working Set | `wc -c` the existing files each task modifies (File Structure map). A task whose files sum to tens of KB — or that points at one file that large — is a splitting candidate even if its boundaries are otherwise clean. Report the measured sizes; do not guess |
+    | Long Suite Declaration | Every suite the plan declares as long states three things: exact command, what counts as a pass, and **what the suite can observe**. Missing the third is an issue: without it no task can ever be exempted on evidence, so the suite runs on every triggering task forever. A trigger written as a list of task numbers rather than as a property of the diff is the same issue |
 
     ## Calibration
 
