@@ -2,12 +2,14 @@
 
 Use template when dispatch task reviewer subagent. Reviewer read task diff once, return two verdicts: spec compliance + code quality.
 
+**Follow this template — fill placeholders, keep every section.** No paraphrase, no condense, no prompt composed from memory. "Do Not Trust the Report", Tests, Calibration, Output Format are what make two verdicts comparable across tasks and stop reviewer re-running suite or grading on implementer's rationale; ad-hoc prompt loses them silently. Template wrong for this dispatch → fix template, not one-off prompt.
+
 **Purpose:** Verify one task implementation match requirements (nothing more, nothing less) and well-built (clean, tested, maintainable)
 
 **Placeholders:**
 - `[MODEL]` — REQUIRED: reviewer model per SKILL.md Model Selection
 - `[BRIEF_FILE]` — REQUIRED: plan task file (`plan/tasks/task.NN.md`) — same self-contained file implementer worked from
-- `[GLOBAL_CONSTRAINTS]` — binding requirements copied verbatim from plan Global Constraints section or spec: exact values, formats, stated relationships between components (not process rules — those already in template)
+- `[GLOBAL_CONSTRAINTS_FILES]` — REQUIRED: path to `plan/global-constraints.md`, handed whole — plus, in layer-split plan, one path per layer task's `**Layers:**` line names. **Same set implementer got**, no more, no less: hand reviewer extra layer file → reviewer flags implementer for missing rule implementer never saw; hand fewer → constraint goes unreviewed. Never a section reference into a bigger file, never an extraction command (`sed -n`, `head -N`): range extraction truncates silently and reviewer cannot tell. Plan-specific spec constraint not in that file and binding this task → move it into that file (Plan Amendments) rather than pasting it here
 - `[REPORT_FILE]` — REQUIRED: file implementer wrote detailed report
 - `[BASE_SHA]` — commit before task
 - `[HEAD_SHA]` — current commit
@@ -25,7 +27,7 @@ Subagent (general-purpose):
 
     Read task file (requirements): [BRIEF_FILE]
 
-    Global constraints from spec/design that bind task: [GLOBAL_CONSTRAINTS]
+    Read constraint files binding task, in full: [GLOBAL_CONSTRAINTS_FILES]. Bind task as if written into task file; task file no restate them. Read each whole — no extract part. These = every constraint binding task; plan may split constraints by layer, other layers' files no apply here.
 
     ## What the Implementer Claims They Built
 

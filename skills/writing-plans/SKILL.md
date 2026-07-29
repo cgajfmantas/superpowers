@@ -29,8 +29,11 @@ Plan lives in `plan/` subfolder of feature directory (`/home/hermes/.superpowers
 
 Plan split across files so no single file grows unwieldy:
 
-- **[PLAN_FILE_PATH]** (`plan/plan.md`) is *index*. Holds plan header, Global Constraints, File Structure, ordered links to task files. **No** task bodies.
+- **[PLAN_FILE_PATH]** (`plan/plan.md`) is *index*. Holds plan header, File Structure, link to Global Constraints, ordered links to task files. **No** task bodies, **no** Global Constraints body.
+- **Global Constraints in own file** at `plan/global-constraints.md` (see Global Constraints).
 - **Each task in own file** under `plan/tasks/` (see Task Structure for naming, layout).
+
+Every artifact a downstream subagent must read is a **whole file it can Read**. Never leave a binding block buried in a bigger file, so nobody has to `sed`/`grep`/`head` a section out of it — truncated or mis-bounded extraction silently drops requirements.
 
 Index lists task files in execution order under `## Tasks` heading (see Plan Index Header).
 
@@ -75,30 +78,83 @@ Task = smallest unit with own test cycle, worth fresh reviewer's gate. Drawing b
 
 **Tech Stack:** [Key technologies/libraries]
 
-## Global Constraints
+**Global Constraints:** [./global-constraints.md](./global-constraints.md) — binds every task
 
-[The spec's project-wide requirements — version floors, dependency limits, naming and copy rules, platform requirements — one line each, with exact values copied verbatim from the spec. Every task's requirements implicitly include this section.]
+[If split by layer, list each layer file here too:]
+**Layer constraints:** [frontend](./global-constraints.frontend.md) · [backend](./global-constraints.backend.md)
 
 ## Tasks
 
+[Plain form — no layer split:]
 1. [Task 1: ...](./tasks/task.01.md)
 2. [Task 2: ...](./tasks/task.02.md)
 
+[Split form — every task annotated with the layers binding it:]
+1. [Task 1: ...](./tasks/task.01.md) — layers: frontend
+2. [Task 2: ...](./tasks/task.02.md) — layers: backend, database
+
 ---
 ```
+
+## Global Constraints
+
+**Saved to own file:** `plan/global-constraints.md`, beside index. Index links it; index holds no copy.
+
+Own file because every downstream dispatch — implementer, task reviewer, final reviewer — hands it as a path. A section inside `plan.md` cannot be handed as a path, and a controller that tries ends up telling the subagent to `sed`/`head` it out of the index, which truncates.
+
+```markdown
+# [Feature Name] — Global Constraints
+
+Binds every task in this plan. Task files do not restate these.
+
+- [One line per project-wide requirement: version floors, dependency limits,
+  naming and copy rules, platform requirements, shared exact values — copied
+  verbatim from the spec.]
+```
+
+Keep it short enough to read whole: only what binds many tasks. Task-specific values live in the task file.
+
+### Splitting by Layer
+
+One file is the default. Split when the plan spans layers with **disjoint toolchains** (frontend / backend / database / infra) *and* the single file has grown past a screenful, so a frontend implementer would read mostly rules that cannot apply to it. Below that, splitting costs more than it saves: four files of five lines each buy nothing and add a routing decision that can go wrong.
+
+When splitting:
+
+- `plan/global-constraints.md` stays, and **every task still reads it**. It holds only what is genuinely cross-cutting — commit conventions, branch rules, language-version floors shared by all layers, shared copy and naming rules.
+- Each layer gets `plan/global-constraints.<layer>.md` — one lowercase layer word, matching the annotations in the index task list.
+- **A constraint binding two or more layers lives in the base file, once.** Never copy it into several layer files: duplicated constraints drift, and the drift procedure below only catches what you remember to grep.
+- Layer names are fixed by the plan, not invented per task. List them in the index header.
+
+**Routing is decided when the plan is written, not at dispatch time.** The index task list annotates each task with its layers, and the task file repeats them (see Task Structure). A controller composing a dispatch reads the annotation — it never infers which layers a task touches from the task's title. A misrouted task is the failure this whole file split exists to prevent: the constraint reaches nobody, and no reviewer sees it either.
+
+A task that legitimately spans layers gets all of them, and reads all of those files. If most tasks span most layers, the layers are not disjoint — go back to one file.
 
 ## Task Structure
 
 **Each task saved to own file** in `plan/tasks/` beside index, named `task.NN.md` (`NN` = zero-padded task number matching index list: `01`, `02`, `03`, ...). One task block per file. Index (`plan/plan.md`) links files in execution order (`./tasks/task.NN.md`), holds no task bodies.
 
-Task file reader has zero context, may read out of order — **each task file must be self-contained**. Restate any Global Constraint, type, signature it depends on; no pointing at other files.
+Task file reader has zero context, may read out of order — **each task file must be self-contained**. Restate any type, signature, or value it depends on; no pointing at other task files.
 
-**Duplication across task files is deliberate; its cost is drift.** When a signature or constraint changes — during plan writing OR execution — grep the old symbol across the whole `plan/` directory, update every occurrence, verify zero leftovers. Values shared by many tasks belong in Global Constraints (one copy); restate only what is task-specific.
+Two exceptions, both handed to the reader as separate whole files by the dispatching controller: the constraint files and the task's own file. So a task file does **not** restate Global Constraints — one copy, one file, read alongside. Anything else it needs, it states.
+
+**When constraints are split by layer** (see Splitting by Layer), each task file names its layers on the line after the heading, matching the index annotation:
+
+```markdown
+### Task N: [Component Name]
+
+**Layers:** frontend
+```
+
+That line is what the controller routes on. A task with no layer line in a split plan is a plan bug — the implementer gets the base file only and silently misses its layer's rules.
+
+**Duplication across task files is deliberate; its cost is drift.** When a signature or constraint changes — during plan writing OR execution — grep the old symbol across the whole `plan/` directory, update every occurrence, verify zero leftovers. Values shared by many tasks belong in `global-constraints.md` (one copy); restate only what is task-specific.
 
 **The plan specifies behavior and contracts, not implementation code.** Interfaces block carries exact signatures — that is what connects tasks. Behavior and Test Cases carry what the code must do, with test cases as data (input → expected output). The implementer writes the actual test and implementation code via real TDD: the failing test fails for a real reason, not one the planner guessed.
 
 ````markdown
 ### Task N: [Component Name]
+
+**Layers:** [only in a layer-split plan — the layers whose constraint files bind this task, matching the index annotation]
 
 **Files:**
 - Create: `exact/path/to/file.py`
@@ -184,7 +240,7 @@ Issues found: fix inline. No re-review — fix, move on. Spec requirement with n
 
 ## Plan Review (subagent)
 
-After self-review passes, before the User Review Gate: dispatch one fresh reviewer subagent using [plan-document-reviewer-prompt.md](plan-document-reviewer-prompt.md) with the spec path and plan index path. Fresh eyes catch what the author cannot — this is the only review of the plan by someone who didn't write it.
+After self-review passes, before the User Review Gate: dispatch one fresh reviewer subagent with [plan-document-reviewer-prompt.md](plan-document-reviewer-prompt.md) **filled in** — placeholders substituted, every section kept, nothing written from memory — passing the spec path and plan index path. Fresh eyes catch what the author cannot — this is the only review of the plan by someone who didn't write it.
 
 Reviewer returns Status + Issues with file references. Issues found: fix them, re-dispatch. Approved: proceed to user review.
 

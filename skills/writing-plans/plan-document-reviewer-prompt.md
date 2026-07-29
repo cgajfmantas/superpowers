@@ -2,6 +2,8 @@
 
 Use template when dispatch plan document reviewer subagent.
 
+**Follow this template — fill placeholders, keep every section.** No paraphrase, no condense, no prompt composed from memory. Sections below are contract making returned review usable; dispatch dropping them buys verdict you cannot act on. Template wrong for this dispatch → fix template, not one-off prompt.
+
 **Purpose:** Verify plan complete, match spec, task decomposition proper.
 
 **Dispatch after:** Complete plan written — index plus every task file.
@@ -21,7 +23,16 @@ Subagent (general-purpose):
     **Plan index to review:** [PLAN_FILE_PATH]
     **Spec for reference:** [SPEC_FILE_PATH]
 
-    The plan is split across files: the index holds the header, Global Constraints, and an ordered task list; each task lives in its own file under `plan/tasks/` beside the index. Read the spec, the index, and EVERY task file — approving from the index alone is not a review.
+    The plan is split across files: the index holds the header and an ordered task list, Global Constraints live in `plan/global-constraints.md` beside it, and each task lives in its own file under `plan/tasks/`. Read the spec, the index, every constraint file, and EVERY task file — approving from the index alone is not a review.
+
+    Task files deliberately do not restate Global Constraints — those files are handed to every implementer alongside its task. Do not flag a task for omitting a global constraint; do flag a project-wide requirement in the spec that appears in neither a constraint file nor any task.
+
+    A plan may split constraints by layer: `global-constraints.md` (cross-cutting, binds every task) plus `global-constraints.<layer>.md`. In that case check, and flag as issues:
+    - a task with no `**Layers:**` line, or a layer named there with no matching file — the controller routes on that line, so a task missing it silently gets the base file only
+    - index task-list annotation disagreeing with the task file's `**Layers:**` line
+    - a task whose declared layers don't cover the files it touches (frontend-only task creating a migration)
+    - the same constraint in the base file and a layer file, or in two layer files — cross-layer constraints belong in the base file once; copies drift
+    - a layer file not linked from the index header
 
     Your review is read-only: report issues, never edit the plan or any other file. Review the documents themselves — do not crawl the codebase; each task file must stand on its own for an implementer with zero context.
 

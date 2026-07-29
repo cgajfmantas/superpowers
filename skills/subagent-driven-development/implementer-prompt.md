@@ -1,14 +1,31 @@
 # Implementer Subagent Prompt Template
 
-Use this template when dispatching an implementer subagent.
+Use this template when dispatching an implementer subagent. **This template is the dispatch prompt** — fill the placeholders, keep the sections. Do not paraphrase it, summarize it, or compose a prompt of your own from memory: the role boundary, workspace constraint, escalation statuses, evidence contract, and report contract below are what make an implementer's report reviewable. A dispatch missing them produces a report the review gate cannot use.
 
 **Placeholders:**
 - `[MODEL]` — REQUIRED: choose per SKILL.md Model Selection; an omitted model silently inherits the session's most expensive one
 - `[BRIEF_FILE]` — REQUIRED: plan task file (`plan/tasks/task.NN.md`) — self-contained requirements
+- `[GLOBAL_CONSTRAINTS_FILES]` — REQUIRED: path to `plan/global-constraints.md`, handed whole — plus, in a layer-split plan, one path per layer the task's `**Layers:**` line names (`plan/global-constraints.<layer>.md`). Never a section reference into a bigger file and never an extraction command — see Handing Constraints below
 - `[REPORT_FILE]` — REQUIRED: file where implementer writes detailed report (`…/sdd/task-NN-report.md`)
 - `[RELEVANT_LESSONS]` — active ledger lessons that can affect this task; omit unrelated history
 - `[WORKSPACE_STRATEGY]` — explicit current-tree/worktree constraint from the human partner
 - `[directory]` — working directory for the task
+
+## Handing Constraints
+
+Global Constraints are their own file (`plan/global-constraints.md`) precisely so this dispatch can hand them as a path.
+
+**Never** write a dispatch that tells the implementer to extract a section — `sed -n '/## Global Constraints/,/^## /p' plan.md`, `head -200`, "read the Global Constraints section of plan.md (that section only)". Range extraction silently truncates at the line cap or mis-fires on the closing boundary, and the implementer cannot tell that it did. It also burns a Bash turn on something a Read handles.
+
+If a plan predates the split and still keeps Global Constraints inside `plan.md`, do not work around it in the prompt: move the section into `plan/global-constraints.md`, link it from the index, and hand the new path. That is a plan edit, so record it per Plan Amendments.
+
+**Layer-split plans.** When the plan carries per-layer constraint files (`global-constraints.frontend.md`, `…backend.md`, `…database.md`), hand the base file **plus** the files for the layers the plan assigns this task. Read the assignment off the index task list annotation and the task file's `**Layers:**` line — never infer it from the task title, and never hand "all layer files to be safe": a backend rule handed to a frontend task is noise the implementer may try to satisfy. Annotation missing, or naming a layer with no file, is a plan bug: fix the plan (Plan Amendments), then dispatch.
+
+## Factoring Out the Invariant Half
+
+Everything in this template except **Task Description**, **Context**, **Execution Context and Lessons**, and **Workspace Constraint** is identical across every task in a run. Writing it into each dispatch verbatim is fine. Writing it once to `…/sdd/implementer-common.md` and having the dispatch say "read this first — role boundary, workspace rules, TDD and verification requirements, report contract" is also fine, and cheaper.
+
+If you factor it out: the common file must carry the invariant sections **complete and verbatim** — it is the template, relocated, not a summary of it. The per-task dispatch then carries the four varying sections plus the paths (`[BRIEF_FILE]`, `[GLOBAL_CONSTRAINTS_FILES]`, `[REPORT_FILE]`). A dispatch that names a common file which was never written from this template, or which was written as a condensed gist of it, is a template violation.
 
 ```
 Subagent (general-purpose):
@@ -35,7 +52,13 @@ Subagent (general-purpose):
 
     Read your task brief first: [BRIEF_FILE]. It is the plan's task file (`plan/tasks/task.NN.md`) and contains the full, self-contained task text.
 
+    Then read the plan's constraints, in full: [GLOBAL_CONSTRAINTS_FILES]. They bind this task as if they were written into your brief; the brief does not restate them. Read each file whole with your file-reading tool — do not extract part of one, and do not skip them because the brief looks complete without them.
+
+    These are every constraint file that binds you. If the plan splits constraints by layer, the ones for other layers do not apply to this task — do not go looking for them.
+
     The brief's Interfaces block is a normative contract: implement those exact signatures verbatim — neighboring tasks depend on them. Its test cases are data (input → expected output): turn each one into a real test.
+
+    If the brief and a constraint file conflict, or two constraint files conflict, stop with NEEDS_CONTEXT — do not pick one.
 
     ## Context
 

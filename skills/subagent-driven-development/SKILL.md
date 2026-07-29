@@ -68,12 +68,12 @@ digraph process {
     "Mark task complete in todo list and progress ledger" [shape=box];
   }
 
-  "Read plan index only (task list + global constraints), create todos" [shape=box];
+  "Read plan index + global-constraints.md only, create todos" [shape=box];
   "More tasks remain?" [shape=diamond];
   "Dispatch final code reviewer subagent (../requesting-code-review/code-reviewer.md)" [shape=box];
   "Use superpowers:finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
-  "Read plan index only (task list + global constraints), create todos" -> "Dispatch implementer subagent (./implementer-prompt.md)";
+  "Read plan index + global-constraints.md only, create todos" -> "Dispatch implementer subagent (./implementer-prompt.md)";
   "Dispatch implementer subagent (./implementer-prompt.md)" -> "Implementer subagent asks questions?";
   "Implementer subagent asks questions?" -> "Use ask tool if human decision needed; answer and provide context" [label="yes"];
   "Use ask tool if human decision needed; answer and provide context" -> "Dispatch implementer subagent (./implementer-prompt.md)";
@@ -92,13 +92,17 @@ digraph process {
 
 ## Pre-Flight Plan Review
 
-Before Task 1, scan plan index (task list + Global Constraints) for conflicts visible without task bodies:
-- task title or Global Constraints contradict each other
+Before Task 1, read plan index (task list) and every constraint file it links — `plan/global-constraints.md` plus any `global-constraints.<layer>.md` — scan for conflicts visible without task bodies:
+- task title or a global constraint contradict each other
+- two constraint files contradict each other, or same constraint appears in base *and* a layer file (drift risk — one copy, in base)
+- layer-split plan whose index annotates a task with a layer that has no file, or leaves a task unannotated
 - constraint mandates something review rubric treats as defect (test asserting nothing, verbatim duplicated logic block)
 
 No reading every task file upfront — index catches plan-level conflicts; per-task review loop nets conflicts that only emerge from implementation. Need one task's detail → read that one file, not all.
 
 Present findings to human as one batched question — each finding beside plan text mandating it, ask which governs — before execution, not one interrupt per discovery mid-plan. Clean scan → proceed silent.
+
+**No `global-constraints.md`?** Plan predates split, constraints still inside `plan.md`. Fix once, here, before Task 1: move `## Global Constraints` section into `plan/global-constraints.md` verbatim, replace section in index with link, record per Plan Amendments. Every dispatch then hands one path. Do **not** instead teach each dispatch to extract section out of `plan.md` — see File Handoffs.
 
 ## Per-Task Entry Gate
 
@@ -163,35 +167,51 @@ Task reviewer may report "⚠️ Cannot verify from diff" items — requirements
 
 ## Plan Amendments
 
-Any decision that contradicts or extends the plan — an answer to an implementer question, resolution of a plan-mandated finding, a BLOCKED caused by wrong plan text, a changed interface — edit the affected task file (and Global Constraints or spec if they carry it) **before continuing**, then append to ledger: `Task N: plan amended — <one line>`. When a signature or shared value changes, grep the old symbol across the whole `plan/` directory and update every occurrence (see writing-plans drift procedure).
+Any decision that contradicts or extends the plan — an answer to an implementer question, resolution of a plan-mandated finding, a BLOCKED caused by wrong plan text, a changed interface — edit the affected task file (and `plan/global-constraints.md` or the spec if they carry it) **before continuing**, then append to ledger: `Task N: plan amended — <one line>`. When a signature or shared value changes, grep the old symbol across the whole `plan/` directory and update every occurrence (see writing-plans drift procedure).
 
 Why: later task files and the final whole-branch reviewer read the plan. Stale plan = review against false requirements, and the next fresh subagent reads text you already overruled.
 
 ## Constructing Reviewer Prompts
 
-Per-task reviews = task-scoped gates. Broad review happens once, at final whole-branch review. Filling reviewer template:
+Per-task reviews = task-scoped gates. Broad review happens once, at final whole-branch review.
+
+**Every dispatch in this skill is a template, filled — never a prompt you write from memory.** Implementer → [implementer-prompt.md](implementer-prompt.md). Task reviewer and re-review → [task-reviewer-prompt.md](task-reviewer-prompt.md). Final whole-branch review → [code-reviewer.md](../requesting-code-review/code-reviewer.md). Fix dispatch → implementer template, scoped to the findings. Read the file at dispatch time; substitute placeholders; keep every section, including the ones that read like boilerplate.
+
+Why it matters more here than it looks: these templates are the *only* thing making a fresh subagent's output comparable across tasks. Drop the reviewer's Calibration section and severities stop meaning the same thing between Task 3 and Task 11. Drop "Do Not Trust the Report" and the reviewer grades the implementer's own rationale. Drop the implementer's Evidence Contract and you get DONE with no RED/GREEN to check. The loss is silent — the dispatch still returns something that reads like a report.
+
+Template genuinely wrong for a dispatch → change the template file, then dispatch from it. A one-off improvised prompt fixes one dispatch and loses the fix for every later one.
+
+Filling reviewer template:
 
 - No open-ended directives like "check all uses" or "run race tests if useful" without concrete task-specific reason
 - No asking reviewer re-run tests implementer already ran on same code — implementer report carries test evidence
 - No pre-judging findings — never instruct reviewer to ignore or not flag specific issue. Believe finding would be false positive → let reviewer raise, adjudicate in review loop. Prompt contains "do not flag," "don't treat X as a defect," "at most Minor," or "the plan chose" — stop: pre-judging, usually to dodge review loop.
-- Global-constraints block handed to reviewer = its attention lens. Copy binding requirements verbatim from plan's Global Constraints or spec: exact values, exact formats, stated relationships between components ("same layout as X", "matches Y"). Reviewer template already carries process rules (YAGNI, test hygiene, review method) — constraints block for what THIS project's spec demands.
+- Global constraints handed to reviewer = its attention lens. Hand `plan/global-constraints.md` **as a path**, same file implementer read — no paste, no re-summary, no section extraction. Binding spec requirement missing from that file (exact value, exact format, stated relationship between components — "same layout as X", "matches Y") → add it to the file per Plan Amendments, then hand path; implementer of every later task needs it too, and a constraint that lives only in one reviewer prompt reaches nobody else. Reviewer template already carries process rules (YAGNI, test hygiene, review method) — constraints file for what THIS project's spec demands.
 - Hand reviewer diff as file: run this skill's `scripts/review-package PLAN_FILE BASE HEAD`, pass reviewer printed file path (or, without bash: `git log --oneline`, `git diff --stat`, and `git diff -U10` for range, redirected to one uniquely named file). Output never enters own context; reviewer sees commit list, stat summary, full diff with context in one Read call. Use BASE recorded before dispatching implementer — never `HEAD~1`, silently truncates multi-commit tasks.
 - Dispatch prompt describes one task, not session history. No pasting accumulated prior-task summaries ("state after Tasks 1-3") into later dispatches — real session dispatch hit 42k chars, 99% pasted history. Fresh subagent needs: its task, interfaces it touches, global constraints. Nothing else.
 - Dispatch fix subagents for Critical and Important findings. Record Minor findings in progress ledger as you go; point final whole-branch review at that list to triage which must fix before merge. Roll-up nobody reads = silent discard.
 - Finding labeled plan-mandated — or any finding conflicting with plan text — is human's decision, like any plan contradiction: present finding + plan text, ask which governs. No dismissing finding because plan mandates it; no dispatching fix that contradicts plan without asking.
+- Final whole-branch review sees the whole branch, so it gets **every** constraint file — base plus all layer files, by path. Only stage where full set is correct; per-task gates get their task's subset.
 - Final whole-branch review gets package too: run `scripts/review-package PLAN_FILE MERGE_BASE HEAD` (MERGE\_BASE = commit branch started from, e.g. `git merge-base main HEAD`), include printed path in final review dispatch — final reviewer reads one file, no re-deriving branch diff with git.
 - Final review dispatch also names project's full test suite command. Final reviewer runs suite independently — only independent execution in pipeline; every earlier test result is implementer self-report. Verdict without own test run (or explicit statement it could not run) = incomplete review.
-- Every fix dispatch carries implementer contract: fix subagent re-runs tests covering its change, reports results. Name covering test files in dispatch — one-line fix no need whole suite. Before re-dispatching reviewer, confirm fix report contains covering tests, command run, output; dispatch re-review once all three present.
+- Fix dispatch = implementer template, scoped to findings — not a hand-written "please fix these" note. Every fix dispatch carries implementer contract: fix subagent re-runs tests covering its change, reports results. Name covering test files in dispatch — one-line fix no need whole suite. Before re-dispatching reviewer, confirm fix report contains covering tests, command run, output; dispatch re-review once all three present.
 - Final whole-branch review returns findings → dispatch ONE fix subagent with complete findings list — not one fixer per finding. Per-finding fixers each rebuild context, re-run suites; real session's final-review fix wave cost more than all its tasks combined.
 
 ## File Handoffs
 
 Everything pasted into dispatch prompt — and everything subagent prints back — stays resident in context rest of session, re-read every later turn. Hand artifacts as files:
 
-- **Task brief:** plan's task file (`plan/tasks/task.NN.md`) *is* brief — self-contained, no extract or copy. No reading task body into own context; hand path to implementer, subagent reads. Dispatch contains:
-  (1) one line where task fits in project; (2) task-file path, introduced as "read this first --- it is your requirements, with the exact values to use verbatim"; (3) interfaces and decisions from earlier tasks task file cannot know; (4) relevant active lessons, or `None`; (5) explicit workspace strategy; (6) your resolution of any ambiguity (if you had to open file); (7) report-file path and report contract. Exact values (numbers, magic strings, signatures, test cases) live in task file.
+**Hand whole files, never section extractions.** Every artifact a subagent must read is a file it can Read start to finish. No dispatch ever tells a subagent to `sed -n '/## Section/,/^## /p'`, `head -N`, or "read section X of that file only": the range can mis-fire on its closing boundary, the line cap truncates, and the subagent cannot tell that it got a partial requirement. Artifact not its own file yet → make it one (Plan Amendments), don't teach the prompt to carve it out.
+
+- **Task brief:** plan's task file (`plan/tasks/task.NN.md`) *is* brief — self-contained, no extract or copy. No reading task body into own context; hand path to implementer, subagent reads.
+- **Global constraints:** `plan/global-constraints.md`, handed by path to every implementer and every reviewer. One file, one copy, whole read. Plan splits constraints by layer → hand base file **plus** files for layers plan assigns task (index task-list annotation + task file's `**Layers:**` line). Route off written annotation, never off task title; same set to implementer and its reviewer. Missing annotation, or layer with no file = plan bug → fix plan first (Plan Amendments).
 - **Report file:** name implementer's report file after task file, same zero-padded number (task `…/plan/tasks/task.NN.md` → report `…/sdd/task-NN-report.md`), put in dispatch prompt. Implementer writes full report there, returns only status, commits, one-line test summary, concerns.
-- **Reviewer inputs:** task reviewer gets three paths — same task file, report file, review package — plus global constraints binding task.
+- **Reviewer inputs:** task reviewer gets same task file, same constraint file set implementer got, report file, review package — four paths, more if layer-split.
+
+**Dispatch prompt = [implementer-prompt.md](implementer-prompt.md), filled.** Not a paraphrase of it, not one composed from memory. Its role boundary, workspace constraint, escalation statuses, evidence contract, and report contract are what make the returned report reviewable — a dispatch that drops them buys a report the review gate cannot use, and a review round to recover. Only these vary per task:
+  (1) one line where task fits in project; (2) task-file path, introduced as "read this first --- it is your requirements, with the exact values to use verbatim"; (3) constraint file paths — base, plus this task's layer files if plan splits by layer; (4) interfaces and decisions from earlier tasks task file cannot know; (5) relevant active lessons, or `None`; (6) explicit workspace strategy; (7) your resolution of any ambiguity (if you had to open file); (8) report-file path. Exact values (numbers, magic strings, signatures, test cases) live in task file.
+
+Rest of template is identical every task — so write it once per run to `…/sdd/implementer-common.md`, complete and verbatim, and have each dispatch read it by path. Relocation, not condensation: a hand-written "common" file that gists the template is the same violation as an ad-hoc prompt. See implementer-prompt.md § Factoring Out the Invariant Half.
 - Fix dispatches append fix report (with test results) to same report file, return short summary; re-reviews read updated file.
 
 ## Durable Progress
@@ -311,7 +331,7 @@ Missing evidence means the task remains open even when the implementation appear
 
 ## Red Flags
 
-**Never:** - Start implementation on main/master branch without explicit user consent - Skip task review, or accept report missing either verdict (spec compliance AND task quality both required) - Proceed with unfixed issues - Dispatch multiple implementation subagents in parallel — they share one working tree and HEAD, so commits and test runs trample each other, and the review gate is sequential by design (each task reviewed before the next builds on it) - Read all task files into own context (read index only; hand each subagent its task-file path, let it read own task) - Make subagent read whole plan (hand single task-file path instead) - Skip scene-setting context (subagent needs where task fits) - Ignore subagent questions (answer before they proceed) - Accept "close enough" on spec compliance (reviewer found spec issues = not done) - Skip review loops (reviewer found issues = implementer fixes = review again) - Let implementer self-review replace actual review (both needed) - Tell reviewer what not to flag, or pre-rate finding severity in dispatch prompt ("treat it as Minor at most") — plan's example code = starting point, not evidence its weaknesses were chosen - Dispatch task reviewer without diff file — generate first (`scripts/review-package PLAN_FILE BASE HEAD`), name printed path in prompt - Move to next task while review has open Critical/Important issues - Re-dispatch task progress ledger already marks complete — check ledger (and `git log`) after any compaction or resume - Resolve a plan contradiction verbally without editing the plan files — the next subagent reads the stale text (see Plan Amendments)
+**Never:** - Start implementation on main/master branch without explicit user consent - Skip task review, or accept report missing either verdict (spec compliance AND task quality both required) - Proceed with unfixed issues - Dispatch multiple implementation subagents in parallel — they share one working tree and HEAD, so commits and test runs trample each other, and the review gate is sequential by design (each task reviewed before the next builds on it) - Read all task files into own context (read index only; hand each subagent its task-file path, let it read own task) - Compose any dispatch from memory instead of filling its template — implementer, task reviewer, re-review, fix, final review (or name an `implementer-common.md` that was gisted rather than relocated verbatim) - Drop a template section because it reads like boilerplate (Calibration, Do Not Trust the Report, Evidence Contract, Output Format) — that is what makes verdicts comparable across tasks - Improvise around a template that fits badly instead of editing the template file - Tell any subagent to `sed`/`grep`/`head` a section out of a bigger file (`sed -n '/## Global Constraints/,/^## /p' plan.md | head -200`) — hand whole files; missing file gets created, not carved out - Paste global constraints into a reviewer prompt instead of handing `plan/global-constraints.md` — pasted constraint reaches that one reviewer and no later implementer - Guess which layer constraint files a task needs from its title, or hand all of them "to be safe" — route off plan's written `**Layers:**` annotation; unannotated task = plan bug, not judgment call - Hand reviewer a different constraint file set than implementer got — reviewer then flags rule implementer never saw, or misses one nobody checked - Make subagent read whole plan (hand single task-file path instead) - Skip scene-setting context (subagent needs where task fits) - Ignore subagent questions (answer before they proceed) - Accept "close enough" on spec compliance (reviewer found spec issues = not done) - Skip review loops (reviewer found issues = implementer fixes = review again) - Let implementer self-review replace actual review (both needed) - Tell reviewer what not to flag, or pre-rate finding severity in dispatch prompt ("treat it as Minor at most") — plan's example code = starting point, not evidence its weaknesses were chosen - Dispatch task reviewer without diff file — generate first (`scripts/review-package PLAN_FILE BASE HEAD`), name printed path in prompt - Move to next task while review has open Critical/Important issues - Re-dispatch task progress ledger already marks complete — check ledger (and `git log`) after any compaction or resume - Resolve a plan contradiction verbally without editing the plan files — the next subagent reads the stale text (see Plan Amendments)
 
 **If subagent asks questions:** - Answer clear and complete - Provide extra context if needed - No rushing into implementation
 

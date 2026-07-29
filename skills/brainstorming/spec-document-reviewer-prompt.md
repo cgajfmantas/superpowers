@@ -2,6 +2,8 @@
 
 Use template when dispatch spec document reviewer subagent.
 
+**Follow this template — fill placeholders, keep every section.** No paraphrase, no condense, no prompt composed from memory. Sections below are contract making returned review usable; dispatch dropping them buys verdict you cannot act on. Template wrong for this dispatch → fix template, not one-off prompt.
+
 **Purpose:** Verify spec complete, consistent, ready for implementation planning.
 
 **Dispatch after:** Spec document written to feature `spec/` folder (`/home/hermes/.superpowers/YYYY/<feature-name>/spec/` — `YYYY` = current year, e.g. `2026`)

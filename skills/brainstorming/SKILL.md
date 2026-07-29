@@ -28,7 +28,7 @@ Every project goes through process. Todo list, single-function utility, config c
 `YYYY` = current year (e.g. `2026`) — never create a literal `YYYY` directory.
 
 Feature owns one directory — `/home/hermes/.superpowers/YYYY/<feature-name>/` —
-everything in sibling subfolders: `spec/`, `plan/`, `sdd/`. Spec goes in `spec/spec.md`; plan (`plan/plan.md`) and task files (`plan/tasks/task.NN.md`) in `plan/` (see superpowers:writing-plans); SDD execution artifacts in `sdd/`.
+everything in sibling subfolders: `spec/`, `plan/`, `sdd/`. Spec goes in `spec/spec.md`; plan index (`plan/plan.md`), global constraints (`plan/global-constraints.md`), and task files (`plan/tasks/task.NN.md`) in `plan/` (see superpowers:writing-plans); SDD execution artifacts in `sdd/`.
 
 ## Checklist
 
@@ -135,7 +135,7 @@ After writing spec document, fresh-eyes check:
 Fix issues inline. No re-review — fix, move on.
 
 **Spec Review (subagent):**
-After self-review, dispatch one fresh reviewer subagent using [spec-document-reviewer-prompt.md](spec-document-reviewer-prompt.md) with the spec path. Fresh eyes catch what the author cannot. Reviewer returns Status + Issues. Issues found: fix them, re-dispatch. Approved: proceed to user review.
+After self-review, dispatch one fresh reviewer subagent with [spec-document-reviewer-prompt.md](spec-document-reviewer-prompt.md) **filled in** — placeholders substituted, every section kept, nothing written from memory — passing the spec path. Fresh eyes catch what the author cannot. Reviewer returns Status + Issues. Issues found: fix them, re-dispatch. Approved: proceed to user review.
 
 **User Review Gate:**
 After spec review loop passes, ask user to review written spec before proceeding:

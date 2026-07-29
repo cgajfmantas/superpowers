@@ -371,6 +371,21 @@ pptx/
 ```
 When: Reference material too large for inline
 
+### Skill with Dispatch Template
+```
+subagent-driven-development/
+  SKILL.md               # Process + when to dispatch
+  implementer-prompt.md  # Prompt to fill and send, verbatim
+```
+When: The skill dispatches subagents.
+
+**A shipped prompt template is normative, not illustrative.** An agent reading your skill will otherwise treat it as an example and write its own prompt from the surrounding prose — observed repeatedly, and the loss is silent: the dispatch still returns something report-shaped, minus the sections that made it checkable. So:
+
+- State it in the template's own opening lines: fill the placeholders, keep every section, no paraphrase, no composing from memory.
+- List placeholders explicitly, marking which are REQUIRED, in the bracket style the template body uses. Two styles in one skill (`{FOO}` in SKILL.md, `[FOO]` in the template) reads as "roughly like this" and invites improvisation.
+- Say where to go when the template fits badly: edit the template file, then dispatch from it. Otherwise the first awkward fit becomes an improvised prompt.
+- Don't restate the template's content in SKILL.md prose. Two copies drift, and the prose copy is the one that gets sent.
+
 ## The Iron Law (Same as TDD)
 
 ```

@@ -4,9 +4,18 @@ Use this template when dispatching a code reviewer subagent.
 
 **Purpose:** Review completed work against requirements and code quality standards before it cascades into more work.
 
+**Follow this template — fill the placeholders, keep every section.** Do not paraphrase it, condense it, or compose a review prompt from memory. The sections below are the contract that makes the returned review usable: severity calibration, the output format the caller acts on, and the standing rules a reviewer must not be talked out of. A dispatch that drops them buys a verdict you cannot act on. If the template is wrong for your dispatch, fix the template — not this one prompt.
+
+**Placeholders:**
+- `[MODEL]` — REQUIRED: choose per the dispatching skill's model selection guidance; an omitted model silently inherits the session's most expensive one
+- `[DESCRIPTION]` — brief summary of what was built
+- `[PLAN_OR_REQUIREMENTS]` — what it should do; prefer a file path over pasted text
+- `[BASE_SHA]` / `[HEAD_SHA]` — commit range under review
+
 ```
 Subagent (general-purpose):
   description: "Review code changes"
+  model: [MODEL]
   prompt: |
     You are a Senior Code Reviewer with expertise in software architecture,
     design patterns, and best practices. Your job is to review completed work

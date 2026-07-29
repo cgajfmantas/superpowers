@@ -31,13 +31,16 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 **2. Dispatch code reviewer subagent:**
 
-Dispatch a `general-purpose` subagent, filling the template at [code-reviewer.md](code-reviewer.md)
+Dispatch a `general-purpose` subagent with the template at [code-reviewer.md](code-reviewer.md), filled.
+
+**Filled, not paraphrased.** Read the template and reproduce it with the placeholders substituted. Do not write a review prompt from memory, summarize the template's sections, or drop the ones that look like boilerplate — the calibration and output-format sections are what make the verdict actionable, and a reviewer given a hand-rolled prompt reports in a shape the workflow does not expect. Template wrong for your case? Fix the template.
 
 **Placeholders:**
-- `{DESCRIPTION}` - Brief summary of what you built
-- `{PLAN_OR_REQUIREMENTS}` - What it should do
-- `{BASE_SHA}` - Starting commit
-- `{HEAD_SHA}` - Ending commit
+- `[MODEL]` - REQUIRED: an omitted model silently inherits the session's most expensive one
+- `[DESCRIPTION]` - Brief summary of what you built
+- `[PLAN_OR_REQUIREMENTS]` - What it should do; prefer a file path over pasted text
+- `[BASE_SHA]` - Starting commit
+- `[HEAD_SHA]` - Ending commit
 
 **3. Act on feedback:**
 - Fix Critical issues immediately
@@ -55,7 +58,7 @@ You: Let me request code review before proceeding.
 BASE_SHA=$(git log --oneline | grep "Task 1" | head -1 | awk '{print $1}')
 HEAD_SHA=$(git rev-parse HEAD)
 
-[Dispatch code reviewer subagent]
+[Dispatch code reviewer subagent with code-reviewer.md filled in]
   DESCRIPTION: Added verifyIndex() and repairIndex() with 4 issue types
   PLAN_OR_REQUIREMENTS: Task 2 from /home/hermes/.superpowers/2026/deployment/plan/tasks/task.02.md
   BASE_SHA: a7981ec
