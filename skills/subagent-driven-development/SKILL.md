@@ -283,7 +283,7 @@ One file per run, created at run start (empty is fine): `review-checklist.md` be
 - **Test is "could this recur in another task?"** Yes → the file, before the next dispatch. Genuinely unique to this task → a task-specific note in that dispatch is the right place.
 - Constraint files carry what this project's spec *demands*; the checklist carries what this project has actually *got wrong*. Neither substitutes for the other, and the checklist never overrides the plan — a line that contradicts plan text goes through Plan Amendments.
 
-Measured: on one 22-task run every reviewer dispatch hand-wrote its own task-specific notes and no checklist existed. Blind spots the reviews had already found — unscoped `<style>` blocks, framework-only utility families, class names built in computed properties — were each patched where found and never checked again; two of them escaped their own tasks and surfaced only in the whole-branch residual list.
+Not hypothetical: on one run without such a file, the commonest defect class was restated in 17 of 20 reviewer dispatches.
 
 ## File Handoffs
 
